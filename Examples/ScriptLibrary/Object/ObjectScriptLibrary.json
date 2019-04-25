@@ -1,0 +1,20 @@
+{
+  "source": [
+    "../LibraryBase.cs",
+    "ObjectAnimation.cs",
+    "ObjectChat.cs",
+    "ObjectChatCommand.cs",
+    "ObjectCollisions.cs",
+    "ObjectGrabRelease.cs",
+    "ObjectInteraction.cs",
+    "ObjectLight.cs",
+    "ObjectLightOnOff.cs",
+    "ObjectMover.cs",
+    "ObjectPositionReset.cs",
+    "ObjectSitStand.cs",
+    "ObjectSound.cs",
+    "ObjectTarget.cs",
+    "ObjectTimeCountdown.cs",
+    "ObjectTimedEvents.cs"
+  ]
+}

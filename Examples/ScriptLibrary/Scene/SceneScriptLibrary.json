@@ -1,0 +1,28 @@
+{
+  "source": [
+    "../LibraryBase.cs",
+    "../LibraryDebugger.cs",
+    "SceneAnimation.cs",
+    "SceneAudioStream.cs",
+    "SceneBroadcaster.cs",
+    "SceneChat.cs",
+    "SceneChatCommand.cs",
+    "SceneCollisions.cs",
+    "SceneDispenser.cs",
+    "SceneHotkey.cs",
+    "SceneInteraction.cs",
+    "SceneLight.cs",
+    "SceneLightOnOff.cs",
+    "SceneMedia.cs",
+    "SceneMover.cs",
+    "ScenePrompt.cs",
+    "SceneSelector.cs",
+    "SceneStoreListing.cs",
+    "SceneSound.cs",
+    "SceneTargeting.cs",
+    "SceneTeleport.cs",
+    "SceneTimeCountdown.cs",
+    "SceneTimedEvents.cs",
+    "SceneVisitors.cs"
+  ]
+}
