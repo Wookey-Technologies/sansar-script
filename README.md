@@ -384,17 +384,12 @@ features such as log messages for debugging.
 
 Notable `Sansar.Script` interfaces include:
  
- **`Log.Write`** - print messages to the debug console (use Ctrl+d to view)
-
- **`ComponentId`** - struct that uniquely identifies a component on a particular object
-
- **`ObjectId`** - struct to uniquely identify an object
-
- **`SessionId`** - struct to uniquely identify a user for a single visit to your experience
-
- **`ICoroutine`** - interface for signalling or aborting coroutines
-
- **`Timer`** - for one-time or repeating events
+* **`Log.Write`** - print messages to the debug console (use Ctrl+d to view)
+* **`ComponentId`** - struct that uniquely identifies a component on a particular object
+* **`ObjectId`** - struct to uniquely identify an object
+* **`SessionId`** - struct to uniquely identify a user for a single visit to your experience
+* **`ICoroutine`** - interface for signalling or aborting coroutines
+* **`Timer`** - for one-time or repeating events
 
 `Sansar.Simulation` is the namespace that contains all of the heavy weight classes for working with
 avatars (known as 'agents'), the scene itself and all of the various components on objects in the scene.
@@ -403,33 +398,23 @@ somewhere.
 
 Notable `Sansar.Simulation` interfaces include:
 
- **`AgentPrivate`** - this is the main class for interaction with the avatars visiting your scene, such
+* **`AgentPrivate`** - this is the main class for interaction with the avatars visiting your scene, such
  as playing sounds, getting hand positions and sending direct messages.  Also the `AgentInfo` struct
  includes the unique `AvatarUuid` to identify a player.
-
- **`AgentPrivate.Client`** - for handling input and teleporting avatars around
-
- **`AgentPrivate.Client.UI.ModalDialog`** - for modal text windows with one or two buttons.
-
- **`ObjectPrivate`** - access object position and retrieve components
-
- **`ObjectPrivate.Mover`** - for moving non-physical objects around
-
- **`ScenePrivate`** - find agents, other scripts, objects, spawn things, adjust gravity, etc.
-
- **`ScenePrivate.Chat`** - general nearby chat
-
- **`SceneObjectScript`** - base class for most scripts
+* **`AgentPrivate.Client`** - for handling input and teleporting avatars around
+* **`AgentPrivate.Client.UI.ModalDialog`** - for modal text windows with one or two buttons.
+* **`ObjectPrivate`** - access object position and retrieve components
+* **`ObjectPrivate.Mover`** - for moving non-physical objects around
+* **`ScenePrivate`** - find agents, other scripts, objects, spawn things, adjust gravity, etc.
+* **`ScenePrivate.Chat`** - general nearby chat
+* **`SceneObjectScript`** - base class for most scripts
 
 In addition to those, `Sansar.Simulation` also includes the following components:
 
- **`AnimationComponent`** - for controlling animations on animated objects
-
- **`AudioComponent`** - for controlling sounds on objects
-
- **`LightComponent`** - for controlling lights
-
- **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
+* **`AnimationComponent`** - for controlling animations on animated objects
+* **`AudioComponent`** - for controlling sounds on objects
+* **`LightComponent`** - for controlling lights
+* **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
 
 
 ### AgentPrivate vs. AgentPublic, etc.
