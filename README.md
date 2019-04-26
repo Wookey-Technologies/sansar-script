@@ -24,25 +24,25 @@ no need to fully understand all of this.
 Get in and start tinkering and you will probably be able to sort out how do many things without
 needing to be an expert in C#!
 
-Also all are encouraged to ask questions and follow the Sansar Discord `#scripting` channel here:
-http://discord.gg/sansarofficial
+Also all are encouraged to ask questions and follow the `#scripting` channel in 
+[Sansar Official Discord!](http://discord.gg/sansarofficial)
 
 Happy scripting!
 
 
 ## Table of contents
 
-**Examples** -- contains a copy of the example scripts that are distributed with Sansar.  By default
+**Examples** - contains a copy of the example scripts that are distributed with Sansar.  By default
 these can be found in your `C:\Program Files\Sansar\Client\ScriptApi\Examples` directory.
 
-**Suggestions** -- contains ideas for future examples and tutorials.  We will periodically review the
+**Suggestions** - contains ideas for future examples and tutorials.  We will periodically review the
 suggestions left in this folder and try to turn them into examples or tutorials if we can.
 
-**Tutorials** -- hopefully this is self-explanatory enough.  Look here if you're trying to get started.
+**Tutorials** - hopefully this is self-explanatory enough.  Look here if you're trying to get started.
 Tutorials are different than examples in that they may include binary assets or other resources you may
 need to follow along.
 
-**Users** -- this is the dumping ground for scripts from individuals within and external to the Sansar
+**Users** - this is the dumping ground for scripts from individuals within and external to the Sansar
 development team.
 
 
@@ -95,33 +95,243 @@ the "Create" menu on the left-hand side and choose the "Edit this scene" option.
 
 Depending on scene complexity, you may find this build/play loop takes a while.  Make sure to change
 the following scene settings to make your iteration time as fast as possible:
+
   **Tools** -> **Scene settings**
+
   ->  **Light**:  Change "Global Illum Quality" to "No processing"
+
   ->  **Background Sound**:  Change "Compute Reverb" to "Off"
 
 
 ## Getting started
 
-And what follows here is a quick summary that might help you get started a bit faster if you are
+What follows here is a quick summary that might help you get started a bit faster if you are
 already familiar with C# syntax and object oriented programming principles.
 
 Most scripts will want to define a new class and derive from the `SceneObjectScript` base class in
-the `Sansar.Simulation` namespace.
+the `Sansar.Simulation` namespace like so:
+
+```c#
+public class ExampleScript : Sansar.Simulation.SceneObjectScript
+{
+    public override void Init() {}
+}
+```
+
+To save you from having to type `Sansar.Simulation` everywhere you'll probably want to 
+start most files with a using statement or two:
+
+```c#
+using Sansar.Simulation;
+
+public class ExampleScript : SceneObjectScript
+{
+    public override void Init() {}
+}
+```
+
+That's technically a full Sansar script!  However, since it does absolutely nothing at all let's
+go ahead and update it before we try using it in a scene.
 
 
 ### How to use the debug console
 
+The `Sansar.Script` namespace includes a log function that can be used to write messages to the
+debug console like so:  `Log.Write("Hello Sansar!");`
+
+So if we drop that into the example above we will get a script that will write a message to the
+debug console at script initialization time.  Go ahead and try this out!
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class HelloSansarScript : SceneObjectScript
+{
+    public override void Init()
+    {
+        Log.Write("Hello Sansar!");
+    }
+}
+```
+
+See the above instructions on how to import this script and attach it to an object in the scene.
+Then when you build and run the scene and press `Ctrl+d` you will see `Hello Sansar!` in the
+console.
+
+For other options with respect to logging try looking 
+[here](file:///C:/Program%20Files/Sansar/Client/ScriptApi/Documentation/Sansar.Script/Log.html)
+
+
 ### How to create properties that can be modified in the editor
 
-### How to see messages in world
-Log.Write
-Chat
-Modal dialogs
-Interation prompts
+In general, public script variables will show up in the editor on the properties panel for the
+object that has the script on it.  More specifically there are a limited set of property types
+that are supported by the Sansar editor.  Here is a sample script with one of each type of
+supported property:
 
-### How to send chat messages
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
 
-### How to make something clickable
+public class PropertiesExampleScript : SceneObjectScript
+{
+    public bool BoolProperty;
+    public int IntProperty;
+    public float FloatProperty;
+    public double DoubleProperty;
+    public string StringProperty;
+    public Vector VectorProperty;
+    public Quaternion QuaternionProperty;
+    public Color ColorProperty;
+    public Interaction InteractionProperty;
+    public ClusterResource ClusterResourceProperty;
+    public SoundResource SoundResourceProperty;
+
+    public override void Init() {}
+}
+```
+
+Note the addition of the `using Sansar;` line so that all of these types can be referenced without
+further qualification.
+
+In addition there are custom C# properties that can be used to set default values, assign ranges,
+override the display name and define a tooltip for each property.  Here are a few examples of these:
+
+```c#
+    [Tooltip("The tooltip for this string property")]
+    [DefaultValue("default string")]
+    [DisplayName("The String Property")]
+    public readonly string MyStringProperty;
+
+    [DefaultValue(3)]
+    [Range(0,5)
+    public readonly int MyRangedIntProperty;
+
+    [Tooltip("Custom object gravity multiplier")]
+    [DefaultValue(1.0f)]
+    [Range(-2.0f, 2.0f)]
+    [DisplayName("Gravity Multiplier")]
+    public readonly float GravityFactor;
+
+    [Tooltip("The pivot point of the rotation, in object local space.")]
+    [DisplayName("Object Rotation Pivot")]
+    [DefaultValue("<0,0,1>")]
+    public readonly Vector RotationPivot;
+
+    [Tooltip("The color of the light for Mode A")]
+    [DisplayName("Mode A Color")]
+    [DefaultValue("(1,0.8,0.5,1)")]
+    public readonly Sansar.Color ColorModeA;
+```
+
+Note that the `Vector` type requires the `<>` brackets for correct default value parsing, while the
+`Color` type uses `()` parenthesis.
+
+Quaternions are also supported and they use the `[]` brackets but you most likely would want to use a 
+`Vector` for a rotation property and then initialize your script rotation from Euler angles like so:
+`Quaternion q = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * MyVectorRotationProperty);` 
+since typing in Quaternion does not come easily to most users!
+
+The `Interaction` type above is a string in the editor but also enables the object to be clickable
+in world.  More on that below.
+
+The `ClusterResource` and `SoundResource` properties allow scripts to interact with and spawn other
+objects in your inventory.  There is no way to specify default values for these types and the editor
+will present the list of objects of that type in the user's inventory.
+
+
+### How to see text in world
+
+There are a few different ways to get messages from a script into the world, depending on what you
+are trying to do.
+
+#### Debug console messages
+
+Messages can be written to the debug console (Ctrl+d) using the `Log.Write` function.
+
+#### Nearby chat messages
+
+Messages can be broadcast to nearby chat via `ScenePrivate.Chat.MessageAllUsers`.
+
+#### Direct messages and private messages
+
+Messages can be sent to an individual as a direct message from `agent.SendChat` where `agent` is an
+instance of `AgentPrivate`.  Usually the `agent` is obtained from a `SessionId` that comes as part
+of the data from an event callback.  For example using the above `InteractionProperty` that would be:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+    if (agent != null)
+        agent.SendChat("Hello from script!");
+});
+```
+
+#### Modal dialogs
+
+Messages can also be presented to the user in a modal dialog like so:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+    if (agent != null) {
+        agent.Client.UI.ModalDialog.Show("Choose your destiny!", "No", "Yes!", (opc) =>
+        {
+            if (agent.Client.UI.ModalDialog.Response == "Yes!")
+                agent.SendChat("You pressed yes!");
+            else
+                agent.SendChat("You pressed no.");
+        });
+    }
+});
+```
+
+#### In-world interaction text
+
+And also interactions can have custom and changeable prompt messages that show up as mouse-over, hover text
+in-world.  See below for details on interaction.
+
+
+### How to make something clickable (using Interaction)
+
+Objects that have an `Interaction` property will be clickable in-world for all users by default.
+
+Note that objects can only have a single interaction property but interaction text can be changed on the fly
+using the `InteractionProperty.SetPrompt` function.  In fact the text can be customized per user.
+
+Also interactions can be enabled and disabled globally or per user.
+
+Lastly, scripts can add a custom interaction at runtime if they wish.
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class AddInteractionScript : SceneObjectScript
+{
+    public readonly string Title;
+
+    public override void Init()
+    {
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, Title, true);
+
+        addData.Interaction.Subscribe((InteractionData data) =>
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+
+            if (agent != null)
+            {
+                agent.SendChat($"Hello from {Title}!");
+            }
+        });
+    }
+}
+```
+
 
 ### How to control animations
 
@@ -152,8 +362,10 @@ Interation prompts
 
 ## Scripting documentation
 
-The full API documentation comes with the Sansar installation and should be available here for most
-users:  `file:///C:/Program%20Files/Sansar/Client/ScriptApi/Documentation/index.html`
+The full API documentation comes with the Sansar installation and should be available 
+[here](file:///C:/Program%20Files/Sansar/Client/ScriptApi/Documentation/index.html) 
+for most users.  If you installed Sansar to a different directory you'll need to browse
+for the documentation here: `Sansar/Client/ScriptApi/Documentation/index.html`
 
 These docs can be intimidating at first but once you get the hang of where to find things you will get
 used to using them as a reference.
@@ -198,10 +410,9 @@ Notable `Sansar.Simulation` interfaces include:
 In addition to those, `Sansar.Simulation` also includes the following components:
 
  **`AnimationComponent`** - for controlling animations on animated objects
- **`AudioComponent`** -- for controlling sounds on objects
- **`LightComponent`** -- for controlling lights
- **`RigidBodyComponent`** -- to adjust physics properties or apply forces to physical objects
-
+ **`AudioComponent`** - for controlling sounds on objects
+ **`LightComponent`** - for controlling lights
+ **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
 
 ### AgentPrivate vs. AgentPublic, etc.
 
