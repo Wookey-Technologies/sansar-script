@@ -230,9 +230,11 @@ Note that the `Vector` type requires the `<>` brackets for correct default value
 `Color` type uses `()` parenthesis.
 
 Quaternions are also supported and they use the `[]` brackets but you most likely would want to use a 
-`Vector` for a rotation property and then initialize your script rotation from Euler angles like so:
-`Quaternion q = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * MyVectorRotationProperty);` 
-since typing in Quaternion does not come easily to most users!
+`Vector` for a rotation property and then initialize your script rotation from Euler angles since 
+typing in Quaternion does not come easily to most users.  This could be done like so:
+```c#
+Quaternion q = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * MyVectorRotationProperty);
+```
 
 The `Interaction` type above is a string in the editor but also enables the object to be clickable
 in world.  More on that below.
@@ -383,10 +385,15 @@ features such as log messages for debugging.
 Notable `Sansar.Script` interfaces include:
  
  **`Log.Write`** - print messages to the debug console (use Ctrl+d to view)
+
  **`ComponentId`** - struct that uniquely identifies a component on a particular object
+
  **`ObjectId`** - struct to uniquely identify an object
+
  **`SessionId`** - struct to uniquely identify a user for a single visit to your experience
+
  **`ICoroutine`** - interface for signalling or aborting coroutines
+
  **`Timer`** - for one-time or repeating events
 
 `Sansar.Simulation` is the namespace that contains all of the heavy weight classes for working with
@@ -399,20 +406,31 @@ Notable `Sansar.Simulation` interfaces include:
  **`AgentPrivate`** - this is the main class for interaction with the avatars visiting your scene, such
  as playing sounds, getting hand positions and sending direct messages.  Also the `AgentInfo` struct
  includes the unique `AvatarUuid` to identify a player.
+
  **`AgentPrivate.Client`** - for handling input and teleporting avatars around
+
  **`AgentPrivate.Client.UI.ModalDialog`** - for modal text windows with one or two buttons.
+
  **`ObjectPrivate`** - access object position and retrieve components
+
  **`ObjectPrivate.Mover`** - for moving non-physical objects around
+
  **`ScenePrivate`** - find agents, other scripts, objects, spawn things, adjust gravity, etc.
+
  **`ScenePrivate.Chat`** - general nearby chat
+
  **`SceneObjectScript`** - base class for most scripts
 
 In addition to those, `Sansar.Simulation` also includes the following components:
 
  **`AnimationComponent`** - for controlling animations on animated objects
+
  **`AudioComponent`** - for controlling sounds on objects
+
  **`LightComponent`** - for controlling lights
+
  **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
+
 
 ### AgentPrivate vs. AgentPublic, etc.
 
