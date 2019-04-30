@@ -10,8 +10,8 @@ sense to seasoned developers.
 
 The easiest way to create interactive content in Sansar is to make use the built-in "Scene Scripts Library".
 This library was formerly referred to as "Simple Scripts" so you may notice that term used instead.
-The instructions here do not focus on the use of these built-in scripts, but are instead intended to
-be helpful in instructing creators in how to write their own scripts.
+The instructions on this page do not focus on the use of these built-in scripts, but are instead intended to
+help creators write their own scripts.
 
 Below the table of contents, there are instructions on how to start making experiences with scripts.
 They can also be handy for anyone trying to get any of the included examples or tutorials in this
@@ -38,7 +38,8 @@ these can be found in your `C:\Program Files\Sansar\Client\ScriptApi\Examples` d
 **Suggestions** - contains ideas for future examples and tutorials.  We will periodically review the
 suggestions left in this folder and try to turn them into examples or tutorials if we can.
 
-**Tutorials** - hopefully this is self-explanatory enough.  Look here if you're trying to get started.
+**Tutorials** - hopefully this is self-explanatory enough.  Look in this directory if you're trying to
+get started.
 Tutorials are different than examples in that they may include binary assets or other resources you may
 need to follow along.
 
@@ -97,10 +98,8 @@ Depending on scene complexity, you may find this build/play loop takes a while. 
 the following scene settings to make your iteration time as fast as possible:
 
   **Tools** -> **Scene settings**
-
-  ->  **Light**:  Change "Global Illum Quality" to "No processing"
-
-  ->  **Background Sound**:  Change "Compute Reverb" to "Off"
+  *  ->  **Light**:  Change "Global Illum Quality" to "No processing"
+  *  ->  **Background Sound**:  Change "Compute Reverb" to "Off"
 
 
 ## Getting started
@@ -131,16 +130,7 @@ public class ExampleScript : SceneObjectScript
 ```
 
 That's technically a full Sansar script!  However, since it does absolutely nothing at all let's
-go ahead and update it before we try using it in a scene.
-
-
-### How to use the debug console
-
-The `Sansar.Script` namespace includes a log function that can be used to write messages to the
-debug console like so:  `Log.Write("Hello Sansar!");`
-
-So if we drop that into the example above we will get a script that will write a message to the
-debug console at script initialization time.  Go ahead and try this out!
+go ahead and update it before we try using it in a scene:
 
 ```c#
 using Sansar.Script;
@@ -155,12 +145,31 @@ public class HelloSansarScript : SceneObjectScript
 }
 ```
 
-See the above instructions on how to import this script and attach it to an object in the scene.
+So as you can see, the `Sansar.Script` namespace includes a log function to print out messages.  
+These messages go to the debug console and are only visible to the owner of the scene.
+
+So if we drop that into the example above we will get a script that will write a message to the
+debug console at script initialization time.  Go ahead and try this out and read on to find out
+how to see these messages!
+
+
+### How to use the debug console
+
+See the above instructions on how to import the script and attach it to an object in the scene.
 Then when you build and run the scene and press `Ctrl+d` you will see `Hello Sansar!` in the
 console.
 
-For other options with respect to logging try looking 
-[here](file:///C:/Program%20Files/Sansar/Client/ScriptApi/Documentation/Sansar.Script/Log.html)
+This logging functionality can also be used to write yellow warning text and red error text to
+the debug console like so:
+
+```c#
+Log.Write(LogLevel.Info, "Information text");
+Log.Write(LogLevel.Warning, "Yellow warning text");
+Log.Write(LogLevel.Error, "Red error text");
+```
+
+For the complete set of logging functionaly check the API documentation in your Sansar installation:
+`C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Script\Log.html`
 
 
 ### How to create properties that can be modified in the editor
@@ -196,6 +205,8 @@ public class PropertiesExampleScript : SceneObjectScript
 Note the addition of the `using Sansar;` line so that all of these types can be referenced without
 further qualification.
 
+#### Descriptions, default values, ranges and tooltips
+
 In addition there are custom C# properties that can be used to set default values, assign ranges,
 override the display name and define a tooltip for each property.  Here are a few examples of these:
 
@@ -203,27 +214,27 @@ override the display name and define a tooltip for each property.  Here are a fe
     [Tooltip("The tooltip for this string property")]
     [DefaultValue("default string")]
     [DisplayName("The String Property")]
-    public readonly string MyStringProperty;
+    public string MyStringProperty;
 
     [DefaultValue(3)]
     [Range(0,5)
-    public readonly int MyRangedIntProperty;
+    public int MyRangedIntProperty;
 
     [Tooltip("Custom object gravity multiplier")]
     [DefaultValue(1.0f)]
     [Range(-2.0f, 2.0f)]
     [DisplayName("Gravity Multiplier")]
-    public readonly float GravityFactor;
+    public float GravityFactor;
 
     [Tooltip("The pivot point of the rotation, in object local space.")]
     [DisplayName("Object Rotation Pivot")]
     [DefaultValue("<0,0,1>")]
-    public readonly Vector RotationPivot;
+    public Vector RotationPivot;
 
     [Tooltip("The color of the light for Mode A")]
     [DisplayName("Mode A Color")]
     [DefaultValue("(1,0.8,0.5,1)")]
-    public readonly Sansar.Color ColorModeA;
+    public Sansar.Color ColorModeA;
 ```
 
 Note that the `Vector` type requires the `<>` brackets for correct default value parsing, while the
@@ -243,6 +254,35 @@ The `ClusterResource` and `SoundResource` properties allow scripts to interact w
 objects in your inventory.  There is no way to specify default values for these types and the editor
 will present the list of objects of that type in the user's inventory.
 
+#### Limits and arrays
+
+Scripts have a maximum number of properties that can be exposed to the editor.  The exact number is
+dependent on the base class type for your script.
+
+For the examples above that derive from `SceneObjectScript` the limit is 20 properties.
+Scripts that derive from `ObjectScript` have a limit of 10 properties.
+
+One way to get beyond the 20 property limit is to use array types.  The syntax for these
+uses the C# `List` like so:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+using System.Collections.Generic;
+
+public class ArrayPropertiesExampleScript : SceneObjectScript
+{
+    public List<bool> BoolValues;
+    public List<int> IntValues;
+    public List<float> FloatValues;
+    // etc.
+}
+```
+
+Note that all of the property types previously introduced will work as arrays although I would not
+recommend using the `Interaction` type in an array since only one will function on an object!
+
 
 ### How to see text in world
 
@@ -251,7 +291,8 @@ are trying to do.
 
 #### Debug console messages
 
-Messages can be written to the debug console (Ctrl+d) using the `Log.Write` function.
+Messages can be written to the debug console (Ctrl+d) using the `Log.Write` function.  These are
+only visible to you, the creator and owner of the scene.
 
 #### Nearby chat messages
 
@@ -300,12 +341,17 @@ in-world.  See below for details on interaction.
 
 ### How to make something clickable (using Interaction)
 
-Objects that have an `Interaction` property will be clickable in-world for all users by default.
+Objects that have an `Interaction` property will be clickable in-world by default for all users:
 
-Note that objects can only have a single interaction property but interaction text can be changed on the fly
-using the `InteractionProperty.SetPrompt` function.  In fact the text can be customized per user.
+```c#
+public Interaction MyInteraction;
+```
 
-Also interactions can be enabled and disabled globally or per user.
+This will display hover text and show a green highlight on the object when a user is pointing at it.  The 
+hover text can be configured in the editor by editing the `MyInteraction` field on the properties panel.
+
+Note that objects can only have a single interaction property but the interaction hover text can be changed
+on the fly using the `Interaction.SetPrompt` function.
 
 Lastly, scripts can add a custom interaction at runtime if they wish.
 
@@ -315,7 +361,7 @@ using Sansar.Simulation;
 
 public class AddInteractionScript : SceneObjectScript
 {
-    public readonly string Title;
+    public string Title;
 
     public override void Init()
     {
@@ -334,10 +380,206 @@ public class AddInteractionScript : SceneObjectScript
 }
 ```
 
+Also note that both the interaction text and the interaction itself can be customized globally or per user.
+
+For the complete set of functionaly related to Interaction, check the API documentation in your Sansar installation:
+`C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
+
 
 ### How to control animations
 
+Sansar supports animations in model FBX files.  These are authored and exported from Maya, Blender, etc. and then
+imported to Sansar.  These files can contain one or more animations which can all be accessed and controlled by the scripting
+API using the `Sansar.Simulation.AnimationComponent`.
+
+Note:  All animations imported to Sansar are resampled to 30fps.  You will want to export animations at 30fps if you plan
+to have precise frame control from your code.
+
+The first task when working with the components in Sansar is to acquire the component from the object.  This can be done
+from a few different API endpoints but a common way is as follows:
+
+```c#
+AnimationComponent animComp;
+ObjectPrivate.TryGetFirstComponent(out animComp);
+```
+
+If the script is running on an object that does not have animations, the above code will fail to acquire an animation component.
+A script can safely playback an animation if it exists with a little error checking:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class AnimationScript : SceneObjectScript
+{
+    public override void Init()
+    {
+        AnimationComponent animComp;
+        if (ObjectPrivate.TryGetFirstComponent(out animComp))
+            animComp.DefaultAnimation.Play();
+        else
+            Log.Write(LogLevel.Warning, "AnimationScript not running on an animated object!");
+    }
+}
+```
+
+As you can see above, a quick way to access the animation from the `AnimationComponent` instance is through the 
+`DefaultAnimation` member.  
+
+If you wish to control playback more precisely, your script will need to use the `AnimationParameters` struct.  
+For example if you wanted to loop a certain animation from frame 10 to frame 50, playback would be done like so:
+
+```c#
+AnimationParameters animParams = animComp.DefaultAnimation.GetParameters();
+animParams.PlaybackMode = AnimationPlaybackMode.Loop;
+animParams.ClampToRange = true;
+animParams.RangeStartFrame = 10;
+animParams.RangeEndFrame = 50;
+animComp.DefaultAnimation.Play(animParams);
+```
+
+You can also create a new animation parameters struct if you prefer but getting the parameters from the animation
+as is done above will preserve any other editor settings.  In this case, notably the playback speed from the editor
+would be preserved since the code is not overwriting that member.  This will allow you to adjust the playback speed
+without having to recompile the script.
+
+If the object has multiple animations in the FBX, your script will need to use the 
+`GetAnimation(string)` or `GetAnimations()` interface instead of simply accessing the `DefaultAnimation`.
+
+For the complete set of functionaly related to animations, check the API documentation
+in your Sansar installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\AnimationComponent.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Animation.html`
+
+
+### How to turn lights on and off
+
+Lights, like animation, has its own component for script control namely the `LightComponent`.  Acquiring access
+to the light component can be done in a very similar way:
+
+```c#
+LightComponent lightComp;
+ObjectPrivate.TryGetFirstComponent(out lightComp);
+```
+
+There are a few things to keep in mind with lights.  Unlike animations that exist for the sake of movement, 
+lights can potentially be optimized in the scene build process.  Because of this, it is necessary to set the
+"scriptable" flag "On" in the editor for each light that your script may want to adjust.  Your script can
+detect whether a light is scriptable using the `IsScriptable` flag.
+
+Here is a script that can safely turn a light off on an object:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class LightOffScript : SceneObjectScript
+{
+    public override void Init()
+    {
+        LightComponent lightComp;
+        if (!ObjectPrivate.TryGetFirstComponent(out lightComp))
+            Log.Write(LogLevel.Warning, "LightScript not running on an object with a light!")
+        else if (!lightComp.IsScriptable)
+            Log.Write(LogLevel.Warning, "LightScript not running on an object with a scriptable light!")
+        else
+            lightComp.SetColorAndIntensity(Color.Black, 0.0f);  // turn the light "off"
+    }
+}
+```
+
+Lights in Sansar combine the color and intensity into a single value that is applied to the scene.  
+As a result, the script API does not have the ability to manipulate them independently.  Also the color
+you apply to a light might be different than the color you retrieve when you query the light but that
+comes with the territory.  The script API uses the nomenclature `GetNormalizedColor` and 
+`GetRelativeIntensity` vs. `SetColorAndIntensity` to reinforce that idea.
+
+Note that shadow casting lights are expensive to render and can be a considerable performance drain on
+lower end machines.  Consider reducing a scene to a single shadow casting light if you or your users
+are experiencing a low framerate.
+
+For the complete set of functionaly related to light components, check the API documentation
+in your Sansar installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\LightComponent.html`
+
+
 ### How to control physical objects
+
+Physical objects in Sansar are those that have physics collision and can be controlled by the physics
+engine.  In the editor properties or object structure, this will appear as a "volume" and the object
+itself will have a "motion type" property, along with "density" and "friction".
+
+In the script API, all physics objects are manipulated from the `RigidBodyComponent`.  Similarly to
+the other components, a common way to get access to the rigid body component is as follows:
+
+```c#
+RigidBodyComponent rbComp;
+ObjectPrivate.TryGetFirstComponent(out rbComp);
+```
+
+A slightly more robust script that will apply an upwards impulse to a dynamic physics object when it
+is clicked would be as follows:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class RigidBodyImpulseScript : SceneObjectScript
+{
+    public Interaction MyInteraction;
+
+    private RigidBodyComponent _rb;
+
+    public override void Init()
+    {
+        if (ObjectPrivate.TryGetFirstComponent(out _rb))
+        {
+            _rb.SetCanGrab(false);  // Disable grabbing for this object
+
+            if (_rb.GetMotionType() == RigidBodyMotionType.MotionTypeDynamic)
+            {
+                MyInteraction.Subscribe((InteractionData data) =>
+                {
+                    _rb.AddLinearImpulse(Vector.Up * 100.0f);
+                });
+            }
+            else
+                Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on a dynamic object!")
+        }
+        else
+            Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on an object with a physics volume!")
+    }
+}
+```
+
+For the complete set of functionaly related to rigid body components, check the API documentation
+in your Sansar installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\RigidBodyComponent.html`
+
+#### The importance of understanding motion type
+
+The "motion type" property is extremely important when it comes to physics objects and it greatly
+affects how the object behaves and what can be done to the object from the script API.  
+
+The "static" motion type indicates that the object will not ever be moving.  This is considered the
+most restrictive motion type.  In fact, static objects built into the scene can potentially be 
+optimized by the build process and are assumed to never move so script manipulation is not possible.
+
+The "keyframed" motion type indicates that the object will only move when explicitly moved from
+script.  This is the next most restrictive motion type.  Also when keyframed objects are moved, 
+they will not stop or otherwise be affected by any other collisions.  They will simply move through 
+everything and push other objects and avatars out of the way.
+
+The "dynamic" motion type indicates that the object will be subject to gravity and other phsyical
+interactions.  This is the least restrictive motion type.  Dynamic objects will fall, roll and
+slide depending on what forces get applied to them in the scene.  They will collide with static
+and keyframed objects and avatars.
+
+Motion types can be changed from script but only to a more restrictive motion type than the initial
+import or scene settings allow.  So for example, an object imported as "dynamic" can be set to
+"keyframed" from script but an object imported as "static" can not be set to "keyframed" or "dynamic".
+
 
 ### How to move non-physical objects
 
@@ -348,7 +590,6 @@ public class AddInteractionScript : SceneObjectScript
 ### How to communicate with other scripts
 
 ### How to find other scripts in the scene
-
 
 ### How to put multiple scripts together
 
@@ -364,13 +605,14 @@ public class AddInteractionScript : SceneObjectScript
 
 ## Scripting documentation
 
-The full API documentation comes with the Sansar installation and should be available 
-[here](file:///C:/Program%20Files/Sansar/Client/ScriptApi/Documentation/index.html) 
-for most users.  If you installed Sansar to a different directory you'll need to browse
-for the documentation here: `Sansar/Client/ScriptApi/Documentation/index.html`
+The full API documentation comes with the Sansar installation and should be available for most users here:
+`C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
+
+If you installed Sansar to a different directory you'll need to browse for the documentation in your Sansar folder.
 
 These docs can be intimidating at first but once you get the hang of where to find things you will get
 used to using them as a reference.
+
 
 ### Brief summary of Sansar namespaces
 
