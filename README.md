@@ -563,13 +563,14 @@ The "motion type" property is extremely important when it comes to physics objec
 affects how the object behaves and what can be done to the object from the script API.  
 
 The "static" motion type indicates that the object will not ever be moving.  This is considered the
-most restrictive motion type.  In fact, static objects built into the scene can potentially be 
-optimized by the build process and are assumed to never move so script manipulation is not possible.
+most restrictive motion type.  In fact, static objects built into the scene are assumed to never move
+and can potentially be optimized by the build process, so script manipulation of static objects is not
+possible.
 
 The "keyframed" motion type indicates that the object will only move when explicitly moved from
-script.  This is the next most restrictive motion type.  Also when keyframed objects are moved, 
+script.  This is the next most restrictive motion type.  When keyframed objects are moved, 
 they will not stop or otherwise be affected by any other collisions.  They will simply move through 
-everything and push other objects and avatars out of the way.
+everything and push avatars and dynamic objects out of the way.
 
 The "dynamic" motion type indicates that the object will be subject to gravity and other phsyical
 interactions.  This is the least restrictive motion type.  Dynamic objects will fall, roll and
@@ -583,7 +584,148 @@ import or scene settings allow.  So for example, an object imported as "dynamic"
 
 ### How to move non-physical objects
 
+
+
+
 ### How to play sounds
+
+There are a variety of ways to play sounds in Sansar.  Sounds can be played through a specific audio emitter
+in a scene, or they can be played spatialized or non-spatialized for a target avatar for everyone in the scene.
+
+Spatialized sound is sound that comes from a specific position in the world.  It is directional and may not
+be heard by avatars that are far away.  Non-spatialized sounds are played at equal volume regardless of where
+the listener might be in the scene.
+
+Scripts can not directly reference audio resources without configuration from the editor.  Here is a sample
+script to play a sound when an object is clicked:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class SoundScript : SceneObjectScript
+{
+    public SoundResource Sound;
+
+    [DefaultValue(80.0f)]
+    [Range(0.0f, 100.0f)]
+    public float Loudness;
+
+    public override void Init()
+    {
+        // Check to make sure a sound has been configured in the editor
+        if (Sound == null)
+        {
+            Log.Write("SoundScript has no configured sound to play!")
+            return;
+        }
+
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, "Play sound", true);
+
+        addData.Interaction.Subscribe((InteractionData data) =>
+        {
+            PlaySettings playSettings = PlaySettings.PlayOnce;
+            playSettings.Loudness = (60.0f * (Loudness / 100.0f)) - 48.0f;  // Convert percentage to decibels (dB)
+
+            ScenePrivate.PlaySound(Sound, playSettings);
+        });
+    }
+}
+```
+
+In this example we are playing the sound in a non-spatialized way for all users in the scene.  Here are alternate
+ways to play back the sound for a specific user or spatialized for all users:
+
+```c#
+ScenePrivate.PlaySoundAtPosition(Sound, someVector, playSettings);  // spatialized, audible for all
+
+agent.PlaySound(Sound, playSettings);  // non-spatialized, only for the agent
+agent.PlaySoundAtPosition(Sound, someVector, playSettings);  // spatialized, only for the agent
+```
+
+Playback on a specific audio emitter in the scene requires acquiring the corresponding `AudioComponent`.  Since
+this is already familiar to you from the animation, light and rigid body component examples above, let's also expand
+this example to start and stop a looping sound, which introduces the concept of a play handle:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class LoopingSoundComponentScript : SceneObjectScript
+{
+    public SoundResource LoopingSound;
+
+    [DefaultValue(80.0f)]
+    [Range(0.0f, 100.0f)]
+    public float Loudness;
+
+    private AudioComponent _audio = null;
+    private PlayHandle _playHandle = null;
+
+    public override void Init()
+    {
+        // Check to make sure a sound has been configured in the editor
+        if (LoopingSound == null)
+        {
+            Log.Write("LoopingSoundComponentScript has no configured sound to play!")
+            return;
+        }
+
+        if (!ObjectPrivate.TryGetFirstComponent(out _audio))
+        {
+            Log.Write("LoopingSoundComponentScript is on an object that does not have an audio emitter.")
+            return;
+        }
+
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, "Play sound", true);
+
+        addData.Interaction.Subscribe((InteractionData data) =>
+        {
+            // If not sound is playing, start one up
+            if (_playHandle == null)
+            {
+                PlaySettings playSettings = PlaySettings.Looped;
+                playSettings.Loudness = (60.0f * (Loudness / 100.0f)) - 48.0f;  // Convert percentage to decibels (dB)
+
+                _playHandle = _audio.PlaySoundOnComponent(LoopingSound, playSettings);
+            }
+            // Else if a sound is playing, stop it
+            else
+            {
+                if (_playHandle.IsPlaying())
+                    _playHandle.Stop();
+
+                _playHandle = null;
+            }
+        });
+    }
+}
+```
+
+As you can see from the above sample, play handles are returned by the sound play interfaces and they can
+be used to control or manipulate a previously played sound.
+
+For the complete set of functionaly related to sounds, check the API documentation
+in your Sansar installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\AudioComponent.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\PlayHandle.html`
+
+Also check the `PlaySound` and `PlaySoundAtPosition` functions on these classes:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\AgentPrivate.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
+
+
+#### Audio play settings
+
+In the above examples we start with the `PlayOnce` or `Looped` settings and then adjusted the other attributes
+as needed.
+
+Note that the `Loudness` setting is expected to be in decibels (dB) but most non-sound designers prefer to work
+in percentages so we end up doing a little math to convert from percentages to dB for the play settings.
+
+The complete documentation can be found here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\PlaySettings.html`
+
 
 ### How to control media streams
 
