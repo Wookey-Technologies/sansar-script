@@ -169,7 +169,7 @@ Log.Write(LogLevel.Error, "Red error text");
 ```
 
 For the complete set of logging functionaly check the API documentation in your Sansar installation:
-`C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Script\Log.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Script\Log.html`
 
 
 ### How to create properties that can be modified in the editor
@@ -383,7 +383,7 @@ public class AddInteractionScript : SceneObjectScript
 Also note that both the interaction text and the interaction itself can be customized globally or per user.
 
 For the complete set of functionaly related to Interaction, check the API documentation in your Sansar installation:
-`C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
 
 
 ### How to control animations
@@ -944,23 +944,26 @@ using Sansar.Simulation;
 
 public class LogGravityChatCommandScript : SceneObjectScript
 {
-    ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) => 
+    public override void Init()
     {
-        if (data.Message == "/setlowgrav")
+        ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) => 
         {
-            AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
-
-            // If the agent is the scene owner
-            if ((agent != null) && (agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid))
+            if (data.Message == "/setlowgrav")
             {
-                // Set the gravity to 15% of earth gravity
-                ScenePrivate.SetGravity(0.15f * 9.81f);
+                AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
 
-                // Send a private acknowledgement message back to the user
-                agent.SendChat("You set low gravity!");
+                // If the agent is the scene owner
+                if ((agent != null) && (agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid))
+                {
+                    // Set the gravity to 15% of earth gravity
+                    ScenePrivate.SetGravity(0.15f * 9.81f);
+
+                    // Send a private acknowledgement message back to the user
+                    agent.SendChat("You set low gravity!");
+                }
             }
-        }
-    });
+        });
+    }
 }
 ```
 
@@ -968,12 +971,213 @@ The complete reference for the chat system can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Chat.html`
 
 
-### How to communicate with other scripts
+### How to send and receive messages between scripts
+
+Scripts can communicate with other scripts using messages.  These messages are broadcast throughout the
+scene and can also include additional data.  This can be a good way to distribute scripting functionality
+within your own scripts, but also to communicate with scripts written by other developers.  In addition,
+it is the main mechanism that the so-called "Simple Scripts" use for communication.  
+See the below section on simple script messaging for more information about this.
+
+The two pieces to this are sending and receiving script messages, which is done through these interfaces:
+
+```c#
+PostScriptEvent("my_event");  // send "my_event"
+SubscribeToScriptEvent("my_event", (ScriptEventData data) => {});  // listen for "my_event"
+```
+
+A pair of script instances could use this event to make a button that turns a light off:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+namespace MessagingScripts
+{
+    public class SendMessageScript : SceneObjectScript
+    {
+        public override void Init()
+        {
+            ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, "Show media", true);
+
+            addData.Interaction.Subscribe((InteractionData data) =>
+            {
+                // Send the "button_pressed" message
+                PostScriptEvent("button_pressed")
+            });
+        }
+    }
+
+    public class ReceiveMessageScript : SceneObjectScript
+    {
+        private LightComponent _light;
+
+        public override void Init()
+        {
+            if (!ObjectPrivate.TryGetFirstComponent(out _light))
+                Log.Write("ReceiveMessageScript couldn't find light!");
+            else if (!_light.IsScriptable)
+                Log.Write("ReceiveMessageScript couldn't find scriptable light!'");
+            else
+            {
+                // Listen for the "button_pressed" message
+                SubscribeToScriptEvent("button_pressed", (ScriptEventData data) =>
+                {
+                    // Turn off the light
+                    _light.SetColorAndIntensity(Color.Black, 0.0f);
+                });
+            }
+        }
+    }
+}
+```
+
+Note also that declaring the namespace allows the script to include more than one class which is a nice
+way to package up interdependent scripts into a single script assembly.
+
+
+### How to connect your scripts to simple scripts
+
+Messaging to and from "Simple Scripts" is exactly the same as messaging within your own scripts with the
+added requirement of a specific data payload interface.  Simple scripts rely on this data payload to 
+extract and reference specific objects and agents.
+
+The interface of incoming simple script message data payloads is as follows:
+
+```c#
+public interface ISimpleData
+{
+    AgentInfo AgentInfo { get; }
+    ObjectId ObjectId { get; }
+    ObjectId SourceObjectId { get; }
+
+    // Extra data
+    Reflective ExtraData { get; }
+}
+```
+
+The `AgentInfo` data conveys the agent that triggered this message.  Note that this is not always set
+since some messages originate from objects that might not have been triggered by avatar interactions,
+such as a timer or an object entering a trigger volume.
+
+The `ObjectId` data is reliably set and contains the Id of the object that triggered the message.  
+For example in a trigger volume collision, the Id of the object that entered the trigger volume would be
+in this field.
+
+The `SourceObjectId` data comes from the object that sent this message.  In the same trigger volume
+example above, this would be the Id of the trigger volume itself.
+
+Here is an example that writes to chat when the "on" message is sent from a simple script:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class SimpleListenerScript : SceneObjectScript
+{
+    public interface ISimpleData
+    {
+        AgentInfo AgentInfo { get; }
+        ObjectId ObjectId { get; }
+        ObjectId SourceObjectId { get; }
+
+        // Extra data
+        Reflective ExtraData { get; }
+    }
+
+    public override void Init()
+    {
+        // Listen for the 'on' message
+        SubscribeToScriptEvent("on", (ScriptEventData data) =>
+        {
+            ISimpleData idata = data.Data.AsInterface<ISimpleData>();
+            if (idata == null)
+            {
+                ScenePrivate.Chat.MessageAllUsers("The 'on' message does not have a simple script payload!");
+            }
+            else
+            {
+                ObjectPrivate obj = ScenePrivate.FindObject(idata.ObjectId);
+                ScenePrivate.Chat.MessageAllUsers("The 'on' message simple script payload came from " + obj.Name);
+            }
+        });
+    }
+}
+```
+
+Sending a message back to simple scripts requires the creation of a payload that supports that same interface.
+One way to do this is to use that exact interface mapped into a `SimpleData` class:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class SimpleSenderScript : SceneObjectScript
+{
+    public interface ISimpleData
+    {
+        AgentInfo AgentInfo { get; }
+        ObjectId ObjectId { get; }
+        ObjectId SourceObjectId { get; }
+
+        // Extra data
+        Reflective ExtraData { get; }
+    }
+
+    public class SimpleData : Reflective, ISimpleData
+    {
+        public SimpleData(ScriptBase script) { ExtraData = script; }
+        public AgentInfo AgentInfo { get; set; }
+        public ObjectId ObjectId { get; set; }
+        public ObjectId SourceObjectId { get; set; }
+
+        public Reflective ExtraData { get; }
+    }
+
+    public override void Init()
+    {
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, Title, true);
+
+        addData.Interaction.Subscribe((InteractionData data) =>
+        {
+            // Create the simple script message data payload
+            SimpleData sd = new SimpleData(this);
+            sd.ObjectId = ObjectPrivate.ObjectId;
+            sd.SourceObjectId = ObjectPrivate.ObjectId;
+
+            // Include the agent info for the avatar that triggered this event
+            AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+            if (agent != null)
+            {
+                sd.AgentInfo = agent.AgentInfo;
+                sd.ObjectInfo = agent.AgentInfo.ObjectId;
+            }
+
+            // Send the "on" message with the SimpleData payload
+            PostScriptEvent("on", sd);
+        });
+    }
+}
+```
+
+The `Reflective` type above is a base interface that exists just for the purposes of being able to use a
+common base type when communicating between scripts and interfaces.  We'll be using it more in the next
+sections about working with other scripts in the scene so for now just know that it exists and plays a
+role in inter-script communication.
+
+The implementation of the simple script data payload interface and all of the other simple script helper 
+functions can be found in your Sansar client installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Examples\ScriptLibrary\LibraryBase.cs`
+
 
 ### How to find other scripts in the scene
 
+
+
+
 ### How to put multiple scripts together
 
+### How to make rest API calls from script
 
 
 ## Gotchas
@@ -987,7 +1191,7 @@ The complete reference for the chat system can be found here:
 ## Scripting documentation
 
 The full API documentation comes with the Sansar installation and should be available for most users here:
-`C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
 
 If you installed Sansar to a different directory you'll need to browse for the documentation in your Sansar folder.
 
