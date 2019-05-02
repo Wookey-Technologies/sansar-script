@@ -464,7 +464,7 @@ ObjectPrivate.TryGetFirstComponent(out lightComp);
 
 There are a few things to keep in mind with lights.  Unlike animations that exist for the sake of movement, 
 lights can potentially be optimized in the scene build process.  Because of this, it is necessary to set the
-"scriptable" flag "On" in the editor for each light that your script may want to adjust.  Your script can
+"Scriptable" flag "On" in the editor for each light that your script may want to adjust.  Your script can
 detect whether a light is scriptable using the `IsScriptable` flag.
 
 Here is a script that can safely turn a light off on an object:
@@ -557,14 +557,14 @@ For the complete set of functionaly related to rigid body components, check the 
 in your Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\RigidBodyComponent.html`
 
-#### The importance of understanding motion type
+#### The thing about motion type...
 
 The "motion type" property is extremely important when it comes to physics objects and it greatly
 affects how the object behaves and what can be done to the object from the script API.  
 
 The "static" motion type indicates that the object will not ever be moving.  This is considered the
-most restrictive motion type.  In fact, static objects built into the scene are assumed to never move
-and can potentially be optimized by the build process, so script manipulation of static objects is not
+most restrictive motion type.  In fact static objects built into the scene are assumed never to move
+and are potentially optimized by the build process, so script manipulation of static objects is not
 possible.
 
 The "keyframed" motion type indicates that the object will only move when explicitly moved from
@@ -584,7 +584,146 @@ import or scene settings allow.  So for example, an object imported as "dynamic"
 
 ### How to move non-physical objects
 
+Objects that have no collision are considered non-physical objects in Sansar.  These can be moved
+with the Mover API if they are configured to be allowed to move.  Much like "static" objects above,
+objects that are not configured for movement are assumed never to move and are potentially optimized 
+by the build process.
 
+To configure an object for movement, set the "Movable From Script" attribute to "On".
+
+Also note that the Mover API can drive "keyframed" physics objects but can not drive "dynamic" or "static"
+physics objects.  So if your object does have a physics volume and you wish to configure it for movement,
+make sure to set the motion type to "keyframed" as well as the "Movable From Script" attribute.
+
+Properly configured objects can then be immediately moved using any of these functions:
+
+```c#
+ObjectPrivate.Mover.AddMove(position, rotation);
+ObjectPrivate.Mover.AddTranslate(position);
+ObjectPrivate.Mover.AddRotate(rotation);
+```
+
+The above functions will result in immediate movement from the object's current position and orientation
+to the specified location.  Use the following interfaces if you prefer to have more gradual movement over
+time:
+
+```c#
+ObjectPrivate.Mover.AddMove(position, rotation, seconds, moveMode);
+ObjectPrivate.Mover.AddTranslate(position, seconds, moveMode);
+ObjectPrivate.Mover.AddRotate(rotation, seconds, moveMode);
+```
+
+The additional arguments are the length of time and specified mode for the movement.  Exactly which
+move mode you choose will depend on the use case but the options are 
+"linear", "ease-in", "ease-out" and "smoothstep".
+
+Note that the mover functions like a queue behind the scenes and executes all commands sequentially.
+In this way it is possible to make a simple behavior to move an object through a set of points:
+
+```c#
+ObjectPrivate.Mover.AddTranslate(point1, 5.0, MoveMode.Linear);
+ObjectPrivate.Mover.AddTranslate(point2, 5.0, MoveMode.Linear);
+ObjectPrivate.Mover.AddTranslate(point3, 5.0, MoveMode.Linear);
+ObjectPrivate.Mover.AddTranslate(point4, 5.0, MoveMode.Linear);
+```
+
+In addition, the `WaitFor` function will run the instructions in a coroutine until the movement has
+completed.  So an object can be safely set to patrol around a few points indefinitely like so:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class PatrolMoverScript : SceneObjectScript
+{
+    public Vector Point1;
+    public Vector Point2;
+    public Vector Point3;
+    public Vector Point4;
+
+    [DefaultValue(1.0f)]
+    public float MoveTime;
+
+    public override void Init()
+    {
+        StartCoroutine(PatrolUpdate);
+    }
+
+    void PatrolUpdate()
+    {
+        while (true)
+        {
+            ObjectPrivate.Mover.AddTranslate(Point1, MoveTime, MoveMode.Linear);
+            ObjectPrivate.Mover.AddTranslate(Point2, MoveTime, MoveMode.Linear);
+            ObjectPrivate.Mover.AddTranslate(Point3, MoveTime, MoveMode.Linear);
+            WaitFor(ObjectPrivate.Mover.AddTranslate, Point4, MoveTime, MoveMode.Linear);
+        }
+    }
+}
+```
+
+A slightly fancier version to rotate the object to face its next goal position before translation
+and move the object at a constanst speed might be something like this:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+using System.Collections.Generic;
+
+public class PatrolTurnMoverScript : SceneObjectScript
+{
+    public List<Vector> PatrolPoints;
+
+    [DefaultValue(1.0f)]
+    public float MoveSpeed;
+
+    [DefaultValue("<0,1,0>")]
+    public Vector WorldObjectForward;
+
+    public override void Init()
+    {
+        if ((PatrolPoints.Count > 1) && (MoveSpeed > 0.0f))
+            StartCoroutine(PatrolUpdate);
+    }
+
+    void PatrolUpdate()
+    {
+        int current = 0;
+        int next = current + 1;
+
+        // Start the object on the first patrol point
+        ObjectPrivate.Mover.AddTranslate(PatrolPoints[current]);
+
+        while (true)
+        {
+            // Calculate direction to next patrol point
+            Vector toNext = PatrolPoints[next] - PatrolPoints[current];
+
+            // Compute a world space rotation for this object to point at the next patrol point
+            Quaternion rotation = Quaternion.ShortestRotation(WorldObjectForward, toNext.Normalized());
+            ObjectPrivate.Mover.AddRotate(rotation);  // Immediately turn to face
+
+            // Compute the time based on the distance and move speed
+            float moveTime = toNext.Length / MoveSpeed;
+
+            // Move the object to the next patrol point
+            WaitFor(ObjectPrivate.Mover.AddTranslate, PatrolPoints[next], moveTime, MoveMode.Linear);
+
+            // Increment to the next patrol point
+            current = next;
+            next = (next + 1) % PatrolPoints.Count;
+        }
+    }
+}
+```
+
+The queue can also be cleared using the `StopAndClear` function to interrupt the movement.
+
+For the full interface, check the API documentation in your Sansar installation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Mover.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\MoveMode.html`
 
 
 ### How to play sounds
@@ -718,7 +857,7 @@ Also check the `PlaySound` and `PlaySoundAtPosition` functions on these classes:
 #### Audio play settings
 
 In the above examples we start with the `PlayOnce` or `Looped` settings and then adjusted the other attributes
-as needed.
+as needed.  This is the recommended way to set up these audio calls.
 
 Note that the `Loudness` setting is expected to be in decibels (dB) but most non-sound designers prefer to work
 in percentages so we end up doing a little math to convert from percentages to dB for the play settings.
@@ -727,7 +866,107 @@ The complete documentation can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\PlaySettings.html`
 
 
-### How to control media streams
+### How to control the media source
+
+Like sounds, the media source for a scene can be controlled globally or on a per-user basis.  Scenes only
+support a single media source though, and there is no functionality to save off a screenshot or otherwise
+freeze a media source to an object.  When the media source updates, all surfaces that use the media source
+material will update to reflect the new data.
+
+The main two interfaces that change the media source can be accessed like so:
+
+```c#
+ScenePrivate.OverrideMediaSource("https://www.sansar.com/");  // scene-wide, all users will see this
+agent.OverrideMediaSource("https://atlas.sansar.com/experiences/sansar-studios/");  // only for this agent
+```
+
+Here is a sample script to change the media source for a specific user when they interact with the object:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class PrivateMediaSourceScript : SceneObjectScript
+{
+    [DefaultValue("https://www.sansar.com/")]
+    public string PublicMedia;
+
+    [DefaultValue("https://atlas.sansar.com/experiences/sansar-studios/")]
+    public string PrivateMedia;
+
+    public override void Init()
+    {
+        // Set the public media source for the scene
+        ScenePrivate.OverrideMediaSource(PublicMedia);
+
+        // Override the media source to the private media source for each user that clicks on this object
+
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, "Show media", true);
+
+        addData.Interaction.Subscribe((InteractionData data) =>
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+
+            if (agent != null)
+            {
+                agent.OverrideMediaSource(PrivateMedia);
+            }
+        }
+    }
+}
+```
+
+The complete reference for these functions can be found on these classes:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\AgentPrivate.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
+
+
+### How to implement chat commands
+
+Sometimes it can be handy to set up scripts to respond to chat commands.  Scripts can do this by 
+subscribing to the default chat channel for the scene and parsing the messages, like so:
+
+```c#
+ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) => {
+    if (data.Message == "hello script")
+        ScenePrivate.Chat.MessageAllUsers("hi!");
+});
+```
+
+Depending on the type of commands and control being put into chat commands, it is often a good
+idea to put some level of restriction based on who sent the command.  So for example here is a
+script that changes world gravity to a low value when the scene owner types "/setlowgrav" but
+will ignore that message from any other user.
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class LogGravityChatCommandScript : SceneObjectScript
+{
+    ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) => 
+    {
+        if (data.Message == "/setlowgrav")
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
+
+            // If the agent is the scene owner
+            if ((agent != null) && (agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid))
+            {
+                // Set the gravity to 15% of earth gravity
+                ScenePrivate.SetGravity(0.15f * 9.81f);
+
+                // Send a private acknowledgement message back to the user
+                agent.SendChat("You set low gravity!");
+            }
+        }
+    });
+}
+```
+
+The complete reference for the chat system can be found here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Chat.html`
+
 
 ### How to communicate with other scripts
 
