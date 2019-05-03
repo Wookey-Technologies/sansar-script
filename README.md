@@ -971,6 +971,94 @@ The complete reference for the chat system can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Chat.html`
 
 
+### How to put multiple scripts together into a single inventory item
+
+As scene and script complexity grows, it is often handy to be able to share code between multiple
+scripts or to define common interfaces for inter-script communication.  Or it can just be a convenient way
+for projects to store all of their scripts within a single inventory resource.
+
+Script resources that contain multiple scripts are referred to as "Script Assemblies" and there are two
+ways to make them.
+
+The easiest way is to define a namespace in your file and then to declare multiple classes within that
+namespace:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+namespace MyCustomNamespace
+{
+    public class Script1 : SceneObjectScript
+    {
+        public override void Init();
+    }
+
+    public class Script2 : SceneObjectScript
+    {
+        public override void Init();
+    }
+
+    // etc.
+}
+```
+
+The import process for this script remains the same.  When the script is assigned to an object in the
+scene, there will be an additional UI element to choose either `Script1` or `Script2` from the namespace.
+
+If you prefer to distribute your scripts across multiple files then the setup will be a little different.
+The classes will still need to be within your custom namespace but each one can sit in a separate file.
+For this same example code let's say we define `Script1.cs` and `Script2.cs` in the same directory.
+In order to import them as one into Sansar, a small JSON project file is required.  
+
+The `MyCustomNamespace.json` file contents would be as follows:
+
+```json
+{
+  "source": [
+    "Script1.cs",
+    "Script2.cs"
+  ]
+}
+```
+
+Importing this script assembly is then done by importing the JSON file instead of the C# files.
+
+There are a few C# properties to improve the usage of a script assembly.  Namely you can override the
+auto-generated name (usually to remove the namespace) and set the default class.  So for example if
+you wanted `Script2` to be the default script selected when this assembly is put on an object and you
+wanted to call it "Master Control Script" instead of "Script2", you would define it like so:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+namespace MyCustomNamespace
+{
+    [Tooltip("This is the master control script.")]
+    [DisplayName("Master Control Script")]
+    [DefaultScript]
+    public class Script2 : SceneObjectScript
+    {
+        public override void Init();
+    }
+}
+```
+
+Another way to shorten the name that shows up in the editor by just removing the namespace is:
+
+```
+namespace MyCustomNamespace
+{
+    [DisplayName(nameof(Script2))]
+    public class Script2 : SceneObjectScript
+    {
+        public override void Init();
+    }
+}
+```
+
+
 ### How to send and receive messages between scripts
 
 Scripts can communicate with other scripts using messages.  These messages are broadcast throughout the
@@ -1161,7 +1249,7 @@ public class SimpleSenderScript : SceneObjectScript
 ```
 
 The `Reflective` type above is a base interface that exists just for the purposes of being able to use a
-common base type when communicating between scripts and interfaces.  We'll be using it more in the next
+common base type when communicating between scripts and interfaces.  We'll be using it more in the 
 sections about working with other scripts in the scene so for now just know that it exists and plays a
 role in inter-script communication.
 
@@ -1175,7 +1263,7 @@ functions can be found in your Sansar client installation:
 
 
 
-### How to put multiple scripts together
+
 
 ### How to make rest API calls from script
 
