@@ -1260,12 +1260,75 @@ functions can be found in your Sansar client installation:
 
 ### How to find other scripts in the scene
 
+The name of the mechanism within Sansar that allows one script to find another script within a scene is
+`Reflective`.  Once a script interface is located, the calling script can make direct function calls into
+the receiving script without the need to send messages back and forth.  It also allows for the 
+distribution of properties across multiple script components and can be easier for iteration.
+
+Doing this requires a two-part setup, namely the receiving script needs to register itself and the calling
+script needs to know how to find the receiver.
+
+On the receiving side, the class needs to register the reflective interface.  This is done using the 
+`[RegisterReflective]` attribute like so:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+
+[RegisterReflective]
+public class ReflectiveReceiverScript : SceneObjectScript
+{
+    public Interaction Button;
+
+    public override void Init() {}
+
+    public void SetButtonEnabled(bool enabled)
+    {
+        Button.SetEnabled(enabled);
+    }
+}
+```
+
+Then on the calling side we query the reflective interfaces to try to find one that matches what we are
+looking for.  This could be done like so:
 
 
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+using System.Linq;
 
+public class ReflectiveCallerScript : SceneObjectScript
+{
+    public interface IButton { void SetButtonEnabled(bool enabled); }
+
+    public override void Init()
+    {
+        IButton[] buttons = ScenePrivate.FindReflective<IButton>("ReflectiveReceiverScript").ToArray();
+        foreach (IButton b in buttons)
+        {
+            b.SetButtonEnabled(true);
+        }
+    }
+}
+```
+
+Note the coupling of `[RegisterReflective]` with `FindReflective`.  This can be done across script and
+script assembly bounds and is very open ended.  In fact any script with the matching name that has the
+defined interface or a superset of the defined interface will be located.
+
+If the receiver script is within the same C# file or within the same script assembly, there is no need
+to declare a special reflective interface and the class type and name can be used directly.  In this
+case it would be:
+
+```c#
+var buttons = ScenePrivate.FindReflective<ReflectiveReceiverScript>("ReflectiveReceiverScript").ToArray();
+```
 
 
 ### How to make rest API calls from script
+
+### How to listen for trigger volume events
 
 
 ## Gotchas
