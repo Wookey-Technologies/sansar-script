@@ -386,6 +386,11 @@ For the complete set of functionaly related to Interaction, check the API docume
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
 
 
+### How to respond to a button press
+
+
+
+
 ### How to control animations
 
 Sansar supports animations in model FBX files.  These are authored and exported from Maya, Blender, etc. and then
@@ -1318,17 +1323,283 @@ script assembly bounds and is very open ended.  In fact any script with the matc
 defined interface or a superset of the defined interface will be located.
 
 If the receiver script is within the same C# file or within the same script assembly, there is no need
-to declare a special reflective interface and the class type and name can be used directly.  In this
-case it would be:
+to declare a special interface and the class type and name can be used directly.  In this case it would
+be:
 
 ```c#
 var buttons = ScenePrivate.FindReflective<ReflectiveReceiverScript>("ReflectiveReceiverScript").ToArray();
 ```
 
+The `FindReflective` function reference can be found here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
+
+
+### How to find scripts on an object
+
+In addition to the above scene-wide interface search, `ObjectPrivate` has a `FindScripts` function.
+It functions similarly and can be acccessed like so:
+
+```c#
+var buttons = ObjectPrivate.FindScripts<ReflectiveReceiverScript>().ToArray();
+```
+
+This object version can be used for more directed operations to work within a limited scope of scripts
+rather than across an entire scene.
+
+There is a variant that allows the class name to be specified as well.  See the API reference here for
+more details:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ObjectPrivate.html`
+
 
 ### How to make rest API calls from script
 
+The scripting system can communicate directly with non-Sansar servers using HTTP requests.  This
+supports `DELETE`, `GET`, `HEAD, `PATCH`, `POST` and `PUT` commands.  Although the use of HTTP 
+requests can greatly increase the functionality available in your experiences, Sansar does not
+provide any rest API endpoints intended for consumer storage of data.  Storage of scores, progress 
+or other data will require your own server management.
+
+The basic structure of an HTTP request in script is as follows:
+
+```c#
+void GetData()
+{
+    // Set up the request type
+    HttpRequestOptions options = new HttpRequestOptions();
+    options.Method = HttpRequestMethod.GET;
+
+    // Fill in some parameters, in this case the sansar URI
+    options.Parameters = new Dictionary<string, string>()
+    {
+        { "sansar_uri", ScenePrivate.SceneInfo.SansarUri },
+    };
+
+    // Make the request
+    ScenePrivate.HttpClient.Request("http://api.my.com/api/v1/getdata",
+                                    options, 
+                                    (HttpClient.RequestData data) =>
+    {
+        // Check for success
+        if (data.Success && data.Response.Status == 200)
+        {
+            // Parse data.Response.Body
+        }
+        else
+        {
+            Log.Write(LogLevel.Error, "HTTP request failed!");
+        }
+    });
+}
+```
+
+Another facet of the API that is useful to enable HTTP in scripts is the `Sansar.Utility`
+namespace which includes JSON serialization helpers.  This can be done via general purpose types:
+
+```c#
+var jsonData = WaitFor(JsonSerializer.Deserialize<Dictionary<string, int>>, data.Response.Body) as JsonSerializationData<Dictionary<string, int>>;
+Dictionary<string, int> jsonDict = jsonData.Object;
+```
+
+Or by declaring classes that match the structure of the return data.
+
+```c#
+public class ItemDefinition
+{
+    public string Id;
+    public string Title;
+    // etc.
+}
+
+public class InventoryData
+{
+    public List<ItemDefinition> Data;
+}
+
+// code in some HTTP request return Action
+var inventoryJson = WaitFor(JsonSerializer.Deserialize<InventoryData>, data.Response.Body) as JsonSerializationData<InventoryData>;
+InventoryData inventoryData = inventoryJson.Object;
+```
+
+Note in this case that the names of the member variables of the classes passed to the JSON
+serializer need to match the names of the keys in the JSON data.
+
+If you wanted to combine storage and retrieval into a single script to track the visitors to your
+scene, for example, you might do something like the following:
+
+```c#
+using Sansar.Script;
+using Sansar.Simulation;
+using Sansar.Utility;
+using System;
+using System.Collections.Generic;
+
+public class HTTPVisitTrackerScript : SceneObjectScript
+{
+    readonly string endpoint = "https://api.my.com/api/v1/sansar_visitor_tracking";
+
+    public override void Init()
+    {
+        if (!ScenePrivate.HttpClient.IsValid)
+        {
+            // In practice this should never happen but just in case...
+            Log.Write(LogLevel.Error, "HTTP client invalid!  Visitor tracking disabled.");
+            return;
+        }
+
+        // Track a visit when a user joins the scene
+        ScenePrivate.User.Subscribe(User.AddUser, (UserData ud) => { TrackVisit(); });
+
+        // Add a chat listener to retrieve visit count when "/visits" is written in chat
+        ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) =>
+        {
+            if (data.Message == "/visits")
+                GetVisits();
+        });
+    }
+
+    void TrackVisit()
+    {
+        HttpRequestOptions options = new HttpRequestOptions();
+        options.Method = HttpRequestMethod.POST;
+
+        options.Parameters = new Dictionary<string, string>()
+        {
+            { "sansar_uri" , ScenePrivate.SceneInfo.SansarUri },
+        };
+
+        ScenePrivate.HttpClient.Request(endpoint, options, (HttpClient.RequestData data) =>
+        {
+            if (!data.Success || data.Response.Status != 200)
+            {
+                ScenePrivate.Chat.MessageAllUsers("HTTPVisitTrackerScript TrackVisit: Error");
+            }
+        });
+    }
+
+    void GetVisits(AgentPrivate agent)
+    {
+        HttpRequestOptions options = new HttpRequestOptions();
+        options.Method = HttpRequestMethod.GET;
+
+        options.Parameters = new Dictionary<string, string>()
+        {
+            { "sansar_uri" , ScenePrivate.SceneInfo.SansarUri },
+        };
+
+        ScenePrivate.HttpClient.Request(endpoint, options, (HttpClient.RequestData data) =>
+        {
+            if (data.Success && data.Response.Status == 200)
+            {
+                Dictionary<string, int> jsonData = ((JsonSerializationData<Dictionary<string, int>>)(WaitFor(JsonSerializer.Deserialize<Dictionary<string, int>>, data.Response.Body))).Object;
+
+                // print returned "visits" count to chat
+                ScenePrivate.Chat.MessageAllUsers("Total visits: " + jsonData["visits"]);
+            }
+            else
+            {
+                ScenePrivate.Chat.MessageAllUsers("GetVisits: Error");
+            }
+        });
+    }
+}
+```
+
+The documentation around HTTP use in Sansar can be found on a few different pages:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpClient.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestMethod.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestOptions.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Utility\JsonSerializer.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Utility\JsonSerializationData.html`
+
+
 ### How to listen for trigger volume events
+
+Trigger volumes are special physics objects that can detect when other objects or avatars
+pass through them.  These are very handy for auto-opening doors, general detection of players
+or a variety of other situations.
+
+Find the "Trigger Volume" asset in the System section of the editor inventory and add it to the
+scene.  Then add a script to the trigger volume to detect objects:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class TriggerVolumeScript : SceneObjectScript
+{
+    public override void Init()
+    {
+        RigidBodyComponent rigidBody;
+
+        if (ObjectPrivate.TryGetFirstComponent(out rigidBody) && rigidBody.IsTriggerVolume())
+            rigidBody.Subscribe(CollisionEventType.Trigger, OnTrigger);
+        else
+            Log.Write(LogLevel.Warning, "TriggerVolumeScript not running on a trigger volume!")
+    }
+
+    void OnTrigger(CollisionData data)
+    {
+        AgentPrivate agent = ScenePrivate.FindAgent(data.HitComponentId.ObjectId);
+
+        if (agent != null)
+        {
+            if (data.Phase == CollisionEventPhase.TriggerEnter)
+                agent.SendChat("Agent entered trigger volume!");
+            else if (data.Phase == CollisionEventPhase.TriggerExit)
+                agent.SendChat("Agent exited trigger volume!");
+        }
+    }
+}
+```
+
+The documentation around this can be found here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\CollisionData.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\RigidBodyComponent.html`
+
+
+### How to check the physics world with raycasts and shapecasts
+
+There are a variety of raycast and shape cast options available in the scene private API.  These
+can be used to query the physics objects in the scene for navigation of script controlled NPC's or
+whatever else.
+
+Basic use is fairly straightforward but sometimes it can be tricky to figure out exactly what
+types of objects have been hit.  Here is an example that sorts through all of the hits of a
+sphere cast to apply a force to the dynamic rigidbodies:
+
+```c#
+void PushObjects()
+{
+    float radius = 5.0f;
+    float distance = 10.0f;
+    Vector pos = ObjectPrivate.Position;
+    RayCastHit[] castHits = ScenePrivate.CastSphere(radius, pos, pos + Vector.Up * distance, ScenePrivate.MaximumCastRayResults);
+
+    for (int i = 0; i < castHits.Length; i++)
+    {
+        // Ignore agents
+        var agent = ScenePrivate.FindAgent(castHits[i].ComponentId.ObjectId);
+        if (agent != null)
+            continue;
+
+        // Ignore other things, whatever these might be
+        var obj = ScenePrivate.FindObject(castHits[i].ComponentId.ObjectId);
+        if (obj == null)
+            continue;
+
+        // Apply a force to push all of the dynamic objects up
+        RigidBodyComponent rb = obj.GetComponent(ComponentType.RigidBodyComponent, 0) as RigidBodyComponent;
+        if ((rb != null) && (rb.GetMotionType() == RigidBodyMotionType.MotionTypeDynamic))
+            rb.AddLinearImpulse(Vector.Up * 100.0f);
+    }
+}
+```
+
+Check the `Cast[Shape]` and `Get[Shape]ClosestPoints` functions for more ways to query the
+physics world:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
 
 
 ## Gotchas
