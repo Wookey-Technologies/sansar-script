@@ -33,6 +33,9 @@ Happy scripting!
 # Table of contents
 
 1. [File structure for this repository](#file-structure-for-this-repository)
+1. [Scripting documentation](#scripting-documentation)
+    1. [Brief summary of Sansar namespaces](#brief-summary-of-sansar-namespaces)
+    1. [AgentPrivate vs. AgentPublic, etc.](#agentprivate-vs.-agentpublic,-etc.)
 1. [How to create a scripted experience in Sansar](#how-to-create-a-scripted-experience-in-sansar)
     1. [Importing](#importing)
     1. [Attaching a script to an object](#attaching-a-script-to-an-object)
@@ -71,11 +74,11 @@ Happy scripting!
     1. [How to listen for trigger volume events](#how-to-listen-for-trigger-volume-events)
     1. [How to check the physics world with raycasts and shapecasts](#how-to-check-the-physics-world-with-raycasts-and-shapecasts)
 1. [Gotchas](#gotchas)
-    1. [Set functions](#set-functions)
-    1. [Throttle exceptions](#throttle-exceptions)
-1. [Scripting documentation](#scripting-documentation)
-    1. [Brief summary of Sansar namespaces](#brief-summary-of-sansar-namespaces)
-    1. [AgentPrivate vs. AgentPublic, etc.](#agentprivate-vs.-agentpublic,-etc.)
+    1. [Set functions and WaitFor](#set-functions-and-waitfor)
+    1. [Unhandled exceptions kill your script](#unhandled-exceptions-kill-your-script)
+        1. [Scripts can be preempted](#scripts-can-be-preempted)
+        1. [Throttle exceptions](#throttle-exceptions)
+        1. [Logging is throttled too](#logging-is-throttled-too)
 
 
 # File structure for this repository
@@ -93,6 +96,75 @@ need to follow along.
 
 **Users** - this is the dumping ground for scripts from individuals within and external to the Sansar
 development team.
+
+
+# Scripting documentation
+
+The full API documentation comes with the Sansar installation and should be available for most users here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
+
+If you installed Sansar to a different directory you'll need to browse for the documentation in your Sansar folder.
+
+These docs can be intimidating at first but once you get the hang of where to find things you will get
+used to using them as a reference.
+
+
+## Brief summary of Sansar namespaces
+
+The main namespaces in the Sansar scripting system are `Sansar`, `Sansar.Script` and `Sansar.Simulation`.
+
+The main `Sansar` namespace includes the base math constants and functions in `Mathf` and a few types
+for working with colors (`Color`), rotations (`Quaternion`) and vectors (`Vector`).
+
+The `Sansar.Script` namespace includes the base types used throughout the script API and access to
+features such as log messages for debugging.  
+
+Notable `Sansar.Script` interfaces include:
+ 
+* **`Log.Write`** - print messages to the debug console (use Ctrl+d to view)
+* **`ComponentId`** - struct that uniquely identifies a component on a particular object
+* **`ObjectId`** - struct to uniquely identify an object
+* **`SessionId`** - struct to uniquely identify a user for a single visit to your experience
+* **`ICoroutine`** - interface for signalling or aborting coroutines
+* **`Timer`** - for one-time or repeating events
+
+`Sansar.Simulation` is the namespace that contains all of the heavy weight classes for working with
+avatars (known as 'agents'), the scene itself and all of the various components on objects in the scene.
+If you're having trouble finding something in the script API, it is most likely in this namespace
+somewhere.
+
+Notable `Sansar.Simulation` interfaces include:
+
+* **`AgentPrivate`** - this is the main class for interaction with the avatars visiting your scene, such
+ as playing sounds, getting hand positions and sending direct messages.  Also the `AgentInfo` struct
+ includes the unique `AvatarUuid` to identify a player.
+* **`AgentPrivate.Client`** - for handling input and teleporting avatars around
+* **`AgentPrivate.Client.UI.ModalDialog`** - for modal text windows with one or two buttons.
+* **`ObjectPrivate`** - access object position and retrieve components
+* **`ObjectPrivate.Mover`** - for moving non-physical objects around
+* **`ScenePrivate`** - find agents, other scripts, objects, spawn things, adjust gravity, etc.
+* **`ScenePrivate.Chat`** - general nearby chat
+* **`SceneObjectScript`** - base class for most scripts
+
+In addition to those, `Sansar.Simulation` also includes the following components:
+
+* **`AnimationComponent`** - for controlling animations on animated objects
+* **`AudioComponent`** - for controlling sounds on objects
+* **`LightComponent`** - for controlling lights
+* **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
+
+
+## AgentPrivate vs. AgentPublic, etc.
+
+If you look at the documentation you will notice that `AgentPrivate` has a corresponding `AgentPublic`
+and `ScenePrivate` has a corresponding `ScenePublic`.  These are in place for a future time when
+people will be able to attach scripts to their own avatars and take them into other people's scenes
+and they can be largely ignored for now.  But the idea is that scene creators will have more access
+to info and more ability to manipulate and probe the scene than scripts brought in by users.
+
+You can note, for example, if you make your script class derive from `ObjectScript` instead of
+`SceneObjectScript` that it will only have access to `ScenePublic` instead of `ScenePrivate`, which
+has a far more limited interface.
 
 
 # How to create a scripted experience in Sansar
@@ -1788,76 +1860,188 @@ physics world:
 
 # Gotchas
 
-## Set functions
-
-## Throttle exceptions
-
-
-
-# Scripting documentation
-
-The full API documentation comes with the Sansar installation and should be available for most users here:
-* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
-
-If you installed Sansar to a different directory you'll need to browse for the documentation in your Sansar folder.
-
-These docs can be intimidating at first but once you get the hang of where to find things you will get
-used to using them as a reference.
+The Sansar scripting system was designed with different constraints than most other game engines
+and as a result there are some quirks to using the API that will come as a surprise to most
+programmers.
 
 
-## Brief summary of Sansar namespaces
+## Set functions and WaitFor
 
-The main namespaces in the Sansar scripting system are `Sansar`, `Sansar.Script` and `Sansar.Simulation`.
+Most of the functions within the scripting API that set values on objects do not actually apply
+the settings immediately.  This is for a variety of reasons from stability to optimization.  Some
+physics properties will trigger a cascade of other computations when changed, for example, so the
+system will wait until the sript system is done before applying any changes, in case the value is
+modified multiple times within a single frame.  
 
-The main `Sansar` namespace includes the base math constants and functions in `Mathf` and a few types
-for working with colors (`Color`), rotations (`Quaternion`) and vectors (`Vector`).
+Because of this, some code you might expect to work will most likely yield strange results.  Consider
+this example on a rigidbody component:
 
-The `Sansar.Script` namespace includes the base types used throughout the script API and access to
-features such as log messages for debugging.  
+```c#
+WaitFor(rigidBody.SetMass, 5.0f);
+rigidBody.SetMass(2.0f);
+float mass = rigidBody.GetMass();
+Log.Write($"Mass is: {mass}");
+```
 
-Notable `Sansar.Script` interfaces include:
- 
-* **`Log.Write`** - print messages to the debug console (use Ctrl+d to view)
-* **`ComponentId`** - struct that uniquely identifies a component on a particular object
-* **`ObjectId`** - struct to uniquely identify an object
-* **`SessionId`** - struct to uniquely identify a user for a single visit to your experience
-* **`ICoroutine`** - interface for signalling or aborting coroutines
-* **`Timer`** - for one-time or repeating events
-
-`Sansar.Simulation` is the namespace that contains all of the heavy weight classes for working with
-avatars (known as 'agents'), the scene itself and all of the various components on objects in the scene.
-If you're having trouble finding something in the script API, it is most likely in this namespace
-somewhere.
-
-Notable `Sansar.Simulation` interfaces include:
-
-* **`AgentPrivate`** - this is the main class for interaction with the avatars visiting your scene, such
- as playing sounds, getting hand positions and sending direct messages.  Also the `AgentInfo` struct
- includes the unique `AvatarUuid` to identify a player.
-* **`AgentPrivate.Client`** - for handling input and teleporting avatars around
-* **`AgentPrivate.Client.UI.ModalDialog`** - for modal text windows with one or two buttons.
-* **`ObjectPrivate`** - access object position and retrieve components
-* **`ObjectPrivate.Mover`** - for moving non-physical objects around
-* **`ScenePrivate`** - find agents, other scripts, objects, spawn things, adjust gravity, etc.
-* **`ScenePrivate.Chat`** - general nearby chat
-* **`SceneObjectScript`** - base class for most scripts
-
-In addition to those, `Sansar.Simulation` also includes the following components:
-
-* **`AnimationComponent`** - for controlling animations on animated objects
-* **`AudioComponent`** - for controlling sounds on objects
-* **`LightComponent`** - for controlling lights
-* **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
+It is very likely that the printed mass in this case will actually be the previously assigned mass
+of "5.0" although it is possible for it to be "2.0" instead, depending on what else is going on in
+the scene.  If you have a variety of settings to assign, you probably don't want to put a `WaitFor`
+around each of them as that will cause each setting to be assigned sequentially and wait for it to
+be applied before continuing execution to the next line.
 
 
-## AgentPrivate vs. AgentPublic, etc.
+## Unhandled exceptions kill your script
 
-If you look at the documentation you will notice that `AgentPrivate` has a corresponding `AgentPublic`
-and `ScenePrivate` has a corresponding `ScenePublic`.  These are in place for a future time when
-people will be able to attach scripts to their own avatars and take them into other people's scenes
-and they can be largely ignored for now.  But the idea is that scene creators will have more access
-to info and more ability to manipulate and probe the scene than scripts brought in by users.
+Any script that triggers or throws an exception that is not caught by the script, will be killed
+by the system.  This means that proper exception handling is required in order to make your scripts
+robust.  This seems like a no-brainer for obvious exceptions but read on to learn about exceptions
+that might creep into your code unexpectedly!
 
-You can note, for example, if you make your script class derive from `ObjectScript` instead of
-`SceneObjectScript` that it will only have access to `ScenePublic` instead of `ScenePrivate`, which
-has a far more limited interface.
+
+### Scripts can be preempted
+
+In engines such as Unity, each script has an `Update` call that will be executed once per frame.
+Sansar has no equivalent to this.  You can set up a coroutine with a small `Wait` to do a periodic
+update but be aware that each individual script could be preempted at nearly any time.
+
+This means that it is nearly impossible to write scripts that won't ever trigger exceptions.
+
+For example this code could trigger an exception:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+    if (agent != null)
+        agent.SendChat("Hello from script!");
+});
+```
+
+It is very unlikely but not impossible for the agent to become invalid betwen the if check
+and the inner portion of the if statement.  For that reason, to make this snippet more robust we
+must expect an exception:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    AgentPrivate agent = ScenePrivate.FindAgent(data.AgentId);
+    if (agent != null)
+    {
+        try
+        {
+            agent.SendChat("Hello from script!");
+        }
+        catch
+        {
+            Log.Write(LogLevel.Warning, "Unable to send chat to agent due to exception.");
+        }
+    }
+});
+```
+
+This is particularly important when dealing with agents as they are amongst the most unpredictable
+objects in the scene, since a user can disconnect, crash, logout or move on to another experience
+at any time.
+
+There is an `agent.IsValid` check that can also be used to check on the validity of the agent, but
+since it doesn't help with the script pre-empting issue it isn't terribly useful in practice.
+
+
+### Throttle exceptions
+
+Another common gotcha is that not everything can be executed as quickly as you might like.  When
+your script attempts to exceed the maximum rate that some function calls are limited to, it will
+throw a throttle exception.  Proper handling is a requirement around these types of operations.
+
+For example consider a button to change the media source to another channel in an array of 
+youtube channel urls:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    _channel = (_channel + 1) % _youtubeChannels.Length;  // increment to next channel
+    ScenePrivate.OverrideMediaSource(_youtubeChannels[_channel]);
+});
+```
+
+Since we don't know how quickly or slowly a user might press this button we will need to consider
+if it is being pressed faster than the media source throttle rate.  If we do not handle this
+exception the script will be killed and the button will stop functioning.  So a naive solution
+might be:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    try
+    {
+        _channel = (_channel + 1) % _youtubeChannels.Length;  // increment to next channel
+        ScenePrivate.OverrideMediaSource(_youtubeChannels[_channel]);
+    }
+    catch (ThrottleException)
+    {
+        Log.Write("Channel not changed due to throttle limiting.");
+    }
+});
+```
+
+The unfortunate part about this workaround would be that any throttled channel changes would skip
+over that youtube channel.  So if we wanted to make this fully functional without skipping over
+anything in the list, we might end up with something like:
+
+```c#
+InteractionProperty.Subscribe((InteractionData data) =>
+{
+    // Disable the button until we successfully update the channel
+    InteractionProperty.SetEnabled(false);
+
+    _channel = (_channel + 1) % _youtubeChannels.Length;  // increment to next channel
+
+    bool success = false;
+    while (!success)
+    {
+        try
+        {
+            // Try to change the channel
+            ScenePrivate.OverrideMediaSource(_youtubeChannels[_channel]);
+            success = true;
+        }
+        catch (ThrottleException)
+        {
+            // Wait a second and try again
+            Wait(TimeSpan.FromSeconds(1.0));
+        }
+    }
+
+    // The channel has been updated, re-enable the button
+    InteractionProperty.SetEnabled(true);
+});
+```
+
+The complete list of functions that are throttled and will throw a `ThrottleException` is:
+
+Function Name | Throttle Rate
+--------------|--------------
+AgentPrivate.SendChat | 64 calls per 2 seconds
+AgentPrivate.OverrideAudioStream | 5 calls per 10 seconds
+AgentPrivate.OverrideMediaSource | 5 calls per 10 seconds
+AgentPrivate.PerformMediaAction | 5 calls per 10 seconds
+AgentPublic.SendChat | 32 calls per 2 seconds
+ScenePrivate.Chat.MessageAllUsers | 32 calls per 2 seconds
+ScenePrivate.CreateCluster | 100 calls per second
+ScenePrivate.HttpClient.Request | 60 calls per minute
+ScenePrivate.OverrideAudioStream | 5 calls per 10 seconds
+ScenePrivate.OverrideMediaSource | 5 calls per 10 seconds
+ScenePrivate.PerformMediaAction | 5 calls per 10 seconds
+
+
+### Logging is throttled too
+
+When scripts write too much text into the debug log, log messaging will be throttled.
+However, this does not throw a `ThrottleException` and instead will result in a warning
+message in the debug console letting you know the logging has been throttled.
+
+For this reason, it is often a good idea to clean up scripts after they are functional
+to save room in the debug console for new script development.  Or consider putting a 
+"Verbose" property on your script to enable and disable logging so you can choose what
+script messages to see.
+
