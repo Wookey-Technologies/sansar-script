@@ -382,34 +382,170 @@ public class AddInteractionScript : SceneObjectScript
 
 Also note that both the interaction text and the interaction itself can be customized globally or per user.
 
-For the complete set of functionaly related to Interaction, check the API documentation in your Sansar installation:
+For the complete set of functionality related to Interaction, check the API documentation in the Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
 
 
 ### How to respond to a button press
 
+The way to have code that executes when a keyboard, mouse or controller button is pressed is to subscribe to
+a command on an agent's client.  Common commands to listen for include "Trigger", "PrimaryAction" and 
+"SecondaryAction".
 
+The complete list of supported commands can be found in the API documentation:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\CommandData.html`
+
+Since the callback is on an agent in the scene, we must first get to the agent somehow.  This can be done
+for all users in a scene by listening for the `User.AddUser` event on the scene itself, or it could be done
+more specifically by waiting for an agent to enter a trigger volume, press a button or pick up an object.
+
+
+#### Respond to a button press for all users in a scene
+
+Scripts might not always be running right from the very start of a scene so tracking commands from all
+users in a scene requires subscribing to commands from the existing users already in the scene and
+listening for new users as they enter the scene to subscribe to their commands as well.
+
+This can be done as follows:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class AllAgentsCommandScript : SceneObjectScript
+{
+    public override void Init()
+    {
+        // Find each user as they enter the scene and list for commands from them
+        ScenePrivate.User.Subscribe(User.AddUser, (UserData ud) =>
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(ud.User);
+            if (agent != null)
+                ListenForCommand(agent);
+        });
+
+        // Listen for commands from any users already in the scene
+        foreach (var agent in ScenePrivate.GetAgents())
+            ListenForCommand(agent);
+    }
+
+    void ListenForCommand(AgentPrivate agent)
+    {
+        agent.Client.SubscribeToCommand("Trigger", CommandAction.Pressed, (CommandData command) =>
+        {
+            Log.Write(agent.AgentInfo.Name + " pressed trigger!");
+        },
+        (canceledData) => { });
+    }
+}
+```
+
+
+#### Respond to a button press only when a user is holding an object
+
+Using the held object callbacks on a rigidbody allows the script to track and respond when it is being held.
+This would be a typical setup for a flashlight or gun to respond to a command while being carried around:
+
+```c#
+using Sansar;
+using Sansar.Script;
+using Sansar.Simulation;
+
+public class HeldObjectCommandScript : SceneObjectScript
+{
+    RigidBodyComponent _rb = null;
+    IEventSubscription _commandSubscription = null;
+
+    public override void Init()
+    {
+        if (!ObjectPrivate.TryGetFirstComponent(out _rb))
+        {
+            Log.Write(LogLevel.Error, "HeldObjectCommandScript can't find a RigidBodyComponent!");
+            return;
+        }
+
+        // Subscribe to the "Trigger" action when the object is picked up
+        _rb.SubscribeToHeldObject(HeldObjectEventType.Grab, (HeldObjectData holdData) =>
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(holdData.HeldObjectInfo.SessionId);
+
+            if (agent != null && agent.IsValid)
+            {
+                _commandSubscription = agent.Client.SubscribeToCommand("Trigger", CommandAction.Pressed, (CommandData command) =>
+                {
+                    Log.Write(agent.AgentInfo.Name + " pressed the button while holding the object!");
+                },
+                (canceledData) => { });
+            }
+        }
+
+        // Unsubscribe from the "Trigger" action when the object is dropped
+        _rb.SubscribeToHeldObject(HeldObjectEventType.Release, (HeldObjectData holdData) =>
+        {
+            if (_commandSubscription != null)
+            {
+                _commandSubscription.Unsubscribe();
+                _commandSubscription = null;
+            }
+        });
+    }
+}
+```
+
+
+#### Using the targeting information in a command
+
+It can often be useful to know what object an agent was pointing at when they performed a command.  If the
+script were to respond to the command by doing a raycast, the relevant object may be out of the way and the
+delay in script processing caused by latency between the server and the client may create a frustrating
+experience for the user.  So for guns or other systems hoping to provide a faster response, it is highly
+recommended to use the `CommandData.TargetingComponent` field.
+
+This can be done like so:
+
+```c#
+agent.Client.SubscribeToCommand("Trigger", CommandAction.Pressed, OnTrigger, (canceledData) => { });
+
+void OnTrigger(CommandData command)
+{
+    if (command.Action != CommandAction.Pressed)
+        return;
+
+    ObjectPrivate targetObject = ScenePrivate.FindObject(command.TargetingComponent.ObjectId);
+    if (targetObject != null)
+    {
+        // Player was pointing at targetObject when they pressed "Trigger"
+    }
+}
+```
+
+Please also look further down in these docs to find the section on raycasts and shapecasts for more options
+on how to query the physics collision shapes in the scene.
+
+The complete set of data for commands can be found here:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\CommandData.html`
 
 
 ### How to control animations
 
 Sansar supports animations in model FBX files.  These are authored and exported from Maya, Blender, etc. and then
-imported to Sansar.  These files can contain one or more animations which can all be accessed and controlled by the scripting
-API using the `Sansar.Simulation.AnimationComponent`.
+imported to Sansar.  These files can contain one or more animations which can all be accessed and controlled by the
+scripting API using the `Sansar.Simulation.AnimationComponent`.
 
-Note:  All animations imported to Sansar are resampled to 30fps.  You will want to export animations at 30fps if you plan
-to have precise frame control from your code.
+Note:  All animations imported to Sansar are resampled to 30fps.  You will want to export animations at 30fps if you
+plan to have precise frame control from your code.
 
-The first task when working with the components in Sansar is to acquire the component from the object.  This can be done
-from a few different API endpoints but a common way is as follows:
+The first task when working with the components in Sansar is to acquire the component from the object.  This can be
+done from a few different API endpoints but a common way is as follows:
 
 ```c#
 AnimationComponent animComp;
 ObjectPrivate.TryGetFirstComponent(out animComp);
 ```
 
-If the script is running on an object that does not have animations, the above code will fail to acquire an animation component.
-A script can safely playback an animation if it exists with a little error checking:
+If the script is running on an object that does not have animations, the above code will fail to acquire an animation
+component.  A script can safely playback an animation if it exists with a little error checking:
 
 ```c#
 using Sansar.Script;
