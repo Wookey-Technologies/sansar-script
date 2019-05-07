@@ -30,13 +30,61 @@ Also all are encouraged to ask questions and follow the `#scripting` channel in
 Happy scripting!
 
 
-## Table of contents
+# Table of contents
+
+1.[File structure for this repository](#file-structure-for-this-repository)
+1.[How to create a scripted experience in Sansar](#how-to-create-a-scripted-experience-in-sansar)
+  1.[Importing](#importing)
+  1.[Attaching a script to an object](#attaching-a-script-to-an-object)
+  1.[Building the scene](#building-the-scene)
+1.[Getting started with scripting](#getting-started-with-scripting)
+  1.[How to use the debug console](#how-to-use-the-debug-console)
+  1.[How to create properties that can be modified in the editor](#how-to-create-properties-that-can-be-modified-in-the-editor)
+    1.[Descriptions, default values, ranges and tooltips](#descriptions,-default-values,-ranges-and-tooltips)
+    1.[Limits and arrays](#limits-and-arrays)
+  1.[How to see text in world](#how-to-see-text-in-world)
+    1.[Debug console messages](#debug-console-messages)
+    1.[Nearby chat messages](#nearby-chat-messages)
+    1.[Direct messages and private messages](#direct-messages-and-private-messages)
+    1.[Modal dialogs](#modal-dialogs)
+    1.[In-world interaction text](#in-world-interaction-text)
+  1.[How to make something clickable (using Interaction)](#how-to-make-something-clickable-(using-interaction))
+  1.[How to respond to a button press](#how-to-respond-to-a-button-press)
+    1.[Respond to a button press for all users in a scene](#respond-to-a-button-press-for-all-users-in-a-scene)
+    1.[Respond to a button press only when a user is holding an object](#respond-to-a-button-press-only-when-a-user-is-holding-an-object)
+    1.[Using the targeting information in a command](#using-the-targeting-information-in-a-command)
+  1.[How to control animations](#how-to-control-animations)
+  1.[How to turn lights on and off](#how-to-turn-lights-on-and-off)
+  1.[How to control physical objects](#how-to-control-physical-objects)
+    1.[The thing about motion type](#the-thing-about-motion-type)
+  1.[How to move non-physical objects](#how-to-move-non-physical-objects)
+  1.[How to play sounds](#how-to-play-sounds)
+    1.[Audio play settings](#audio-play-settings)
+  1.[How to control the media source](#how-to-control-the-media-source)
+  1.[How to implement chat commands](#how-to-implement-chat-commands)
+  1.[How to put multiple scripts together into a single inventory item](#how-to-put-multiple-scripts-together-into-a-single-inventory-item)
+  1.[How to send and receive messages between scripts](#how-to-send-and-receive-messages-between-scripts)
+  1.[How to connect your scripts to simple scripts](#how-to-connect-your-scripts-to-simple-scripts)
+  1.[How to find other scripts in the scene](#how-to-find-other-scripts-in-the-scene)
+  1.[How to find scripts on an object](#how-to-find-scripts-on-an-object)
+  1.[How to make rest API calls from script](#how-to-make-rest-api-calls-from-script)
+  1.[How to listen for trigger volume events](#how-to-listen-for-trigger-volume-events)
+  1.[How to check the physics world with raycasts and shapecasts](#how-to-check-the-physics-world-with-raycasts-and-shapecasts)
+1.[Gotchas](#gotchas)
+  1.[Set functions](#set-functions)
+  1.[Throttle exceptions](#throttle-exceptions)
+1.[Scripting documentation](#scripting-documentation)
+  1.[Brief summary of Sansar namespaces](#brief-summary-of-sansar-namespaces)
+  1.[AgentPrivate vs. AgentPublic, etc.](#agentprivate-vs.-agentpublic,-etc.)
+
+
+# File structure for this repository
 
 **Examples** - contains a copy of the example scripts that are distributed with Sansar.  By default
 these can be found in your `C:\Program Files\Sansar\Client\ScriptApi\Examples` directory.
 
-**Suggestions** - contains ideas for future examples and tutorials.  We will periodically review the
-suggestions left in this folder and try to turn them into examples or tutorials if we can.
+**Samples** - contains all of the snippets of code from the documentation here, saved out as individual
+files for ease-of-use.
 
 **Tutorials** - hopefully this is self-explanatory enough.  Look in this directory if you're trying to
 get started.
@@ -47,7 +95,7 @@ need to follow along.
 development team.
 
 
-## How to create an experience and use a script in Sansar
+# How to create a scripted experience in Sansar
 
 The first step to creating a new experience in Sansar is to find the Build menu and create a new
 experience.  I would suggest starting from the Base Template so you have a scene that you can build
@@ -59,7 +107,7 @@ object or by dragging the script out of your inventory and dropping it on the ob
 
 After that, you need to build your scene to see your script in action!
 
-### Importing
+## Importing
 
 1. Download an example script or tutorial from this repository.
 2. In the Sansar Editor, choose:
@@ -75,7 +123,7 @@ change the Inventory window first filter to "Created" or "All sources" and the s
 "Scripts" or "All types".  If the last filter is "Newest" then the script you just imported should
 now be in the top left corner of the Inventory window.
 
-### Attaching a script to an object
+## Attaching a script to an object
 
 There are several ways to attach a script to an object in the world.  The basic method is to drag
 the script from your inventory and drop it onto the object.  This will automatically add a new script
@@ -86,7 +134,7 @@ Alternatively, you can right click on an object in the world or in the "Scene Ob
 Then you will need to look at the Properties panel for that object, find the script component and set
 the "Script" property to your newly imported script.
 
-### Building the scene
+## Building the scene
 
 Once the script is attached to an object in the scene and you are ready to test it, hit the "Build"
 button to save, build and upload your scene.  Then choose the "Visit Now" option to see it in action.
@@ -102,7 +150,7 @@ the following scene settings to make your iteration time as fast as possible:
   *  ->  **Background Sound**:  Change "Compute Reverb" to "Off"
 
 
-## Getting started
+# Getting started with scripting
 
 What follows here is a quick summary that might help you get started a bit faster if you are
 already familiar with C# syntax and object oriented programming principles.
@@ -153,7 +201,7 @@ debug console at script initialization time.  Go ahead and try this out and read
 how to see these messages!
 
 
-### How to use the debug console
+## How to use the debug console
 
 See the above instructions on how to import the script and attach it to an object in the scene.
 Then when you build and run the scene and press `Ctrl+d` you will see `Hello Sansar!` in the
@@ -172,7 +220,7 @@ For the complete set of logging functionaly check the API documentation in your 
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Script\Log.html`
 
 
-### How to create properties that can be modified in the editor
+## How to create properties that can be modified in the editor
 
 In general, public script variables will show up in the editor on the properties panel for the
 object that has the script on it.  More specifically there are a limited set of property types
@@ -205,7 +253,7 @@ public class PropertiesExampleScript : SceneObjectScript
 Note the addition of the `using Sansar;` line so that all of these types can be referenced without
 further qualification.
 
-#### Descriptions, default values, ranges and tooltips
+### Descriptions, default values, ranges and tooltips
 
 In addition there are custom C# properties that can be used to set default values, assign ranges,
 override the display name and define a tooltip for each property.  Here are a few examples of these:
@@ -254,7 +302,7 @@ The `ClusterResource` and `SoundResource` properties allow scripts to interact w
 objects in your inventory.  There is no way to specify default values for these types and the editor
 will present the list of objects of that type in the user's inventory.
 
-#### Limits and arrays
+### Limits and arrays
 
 Scripts have a maximum number of properties that can be exposed to the editor.  The exact number is
 dependent on the base class type for your script.
@@ -284,21 +332,21 @@ Note that all of the property types previously introduced will work as arrays al
 recommend using the `Interaction` type in an array since only one will function on an object!
 
 
-### How to see text in world
+## How to see text in world
 
 There are a few different ways to get messages from a script into the world, depending on what you
 are trying to do.
 
-#### Debug console messages
+### Debug console messages
 
 Messages can be written to the debug console (Ctrl+d) using the `Log.Write` function.  These are
 only visible to you, the creator and owner of the scene.
 
-#### Nearby chat messages
+### Nearby chat messages
 
 Messages can be broadcast to nearby chat via `ScenePrivate.Chat.MessageAllUsers`.
 
-#### Direct messages and private messages
+### Direct messages and private messages
 
 Messages can be sent to an individual as a direct message from `agent.SendChat` where `agent` is an
 instance of `AgentPrivate`.  Usually the `agent` is obtained from a `SessionId` that comes as part
@@ -313,7 +361,7 @@ InteractionProperty.Subscribe((InteractionData data) =>
 });
 ```
 
-#### Modal dialogs
+### Modal dialogs
 
 Messages can also be presented to the user in a modal dialog like so:
 
@@ -333,13 +381,13 @@ InteractionProperty.Subscribe((InteractionData data) =>
 });
 ```
 
-#### In-world interaction text
+### In-world interaction text
 
 And also interactions can have custom and changeable prompt messages that show up as mouse-over, hover text
 in-world.  See below for details on interaction.
 
 
-### How to make something clickable (using Interaction)
+## How to make something clickable (using Interaction)
 
 Objects that have an `Interaction` property will be clickable in-world by default for all users:
 
@@ -386,7 +434,7 @@ For the complete set of functionality related to Interaction, check the API docu
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Interaction.html`
 
 
-### How to respond to a button press
+## How to respond to a button press
 
 The way to have code that executes when a keyboard, mouse or controller button is pressed is to subscribe to
 a command on an agent's client.  Common commands to listen for include "Trigger", "PrimaryAction" and 
@@ -400,7 +448,7 @@ for all users in a scene by listening for the `User.AddUser` event on the scene 
 more specifically by waiting for an agent to enter a trigger volume, press a button or pick up an object.
 
 
-#### Respond to a button press for all users in a scene
+### Respond to a button press for all users in a scene
 
 Scripts might not always be running right from the very start of a scene so tracking commands from all
 users in a scene requires subscribing to commands from the existing users already in the scene and
@@ -442,7 +490,7 @@ public class AllAgentsCommandScript : SceneObjectScript
 ```
 
 
-#### Respond to a button press only when a user is holding an object
+### Respond to a button press only when a user is holding an object
 
 Using the held object callbacks on a rigidbody allows the script to track and respond when it is being held.
 This would be a typical setup for a flashlight or gun to respond to a command while being carried around:
@@ -494,7 +542,7 @@ public class HeldObjectCommandScript : SceneObjectScript
 ```
 
 
-#### Using the targeting information in a command
+### Using the targeting information in a command
 
 It can often be useful to know what object an agent was pointing at when they performed a command.  If the
 script were to respond to the command by doing a raycast, the relevant object may be out of the way and the
@@ -527,7 +575,7 @@ The complete set of data for commands can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\CommandData.html`
 
 
-### How to control animations
+## How to control animations
 
 Sansar supports animations in model FBX files.  These are authored and exported from Maya, Blender, etc. and then
 imported to Sansar.  These files can contain one or more animations which can all be accessed and controlled by the
@@ -593,7 +641,7 @@ in your Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Animation.html`
 
 
-### How to turn lights on and off
+## How to turn lights on and off
 
 Lights, like animation, has its own component for script control namely the `LightComponent`.  Acquiring access
 to the light component can be done in a very similar way:
@@ -644,7 +692,7 @@ in your Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\LightComponent.html`
 
 
-### How to control physical objects
+## How to control physical objects
 
 Physical objects in Sansar are those that have physics collision and can be controlled by the physics
 engine.  In the editor properties or object structure, this will appear as a "volume" and the object
@@ -698,7 +746,7 @@ For the complete set of functionaly related to rigid body components, check the 
 in your Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\RigidBodyComponent.html`
 
-#### The thing about motion type...
+### The thing about motion type
 
 The "motion type" property is extremely important when it comes to physics objects and it greatly
 affects how the object behaves and what can be done to the object from the script API.  
@@ -723,7 +771,7 @@ import or scene settings allow.  So for example, an object imported as "dynamic"
 "keyframed" from script but an object imported as "static" can not be set to "keyframed" or "dynamic".
 
 
-### How to move non-physical objects
+## How to move non-physical objects
 
 Objects that have no collision are considered non-physical objects in Sansar.  These can be moved
 with the Mover API if they are configured to be allowed to move.  Much like "static" objects above,
@@ -867,7 +915,7 @@ For the full interface, check the API documentation in your Sansar installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\MoveMode.html`
 
 
-### How to play sounds
+## How to play sounds
 
 There are a variety of ways to play sounds in Sansar.  Sounds can be played through a specific audio emitter
 in a scene, or they can be played spatialized or non-spatialized for a target avatar for everyone in the scene.
@@ -995,7 +1043,7 @@ Also check the `PlaySound` and `PlaySoundAtPosition` functions on these classes:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
 
 
-#### Audio play settings
+### Audio play settings
 
 In the above examples we start with the `PlayOnce` or `Looped` settings and then adjusted the other attributes
 as needed.  This is the recommended way to set up these audio calls.
@@ -1007,7 +1055,7 @@ The complete documentation can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\PlaySettings.html`
 
 
-### How to control the media source
+## How to control the media source
 
 Like sounds, the media source for a scene can be controlled globally or on a per-user basis.  Scenes only
 support a single media source though, and there is no functionality to save off a screenshot or otherwise
@@ -1062,7 +1110,7 @@ The complete reference for these functions can be found on these classes:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
 
 
-### How to implement chat commands
+## How to implement chat commands
 
 Sometimes it can be handy to set up scripts to respond to chat commands.  Scripts can do this by 
 subscribing to the default chat channel for the scene and parsing the messages, like so:
@@ -1112,7 +1160,7 @@ The complete reference for the chat system can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\Chat.html`
 
 
-### How to put multiple scripts together into a single inventory item
+## How to put multiple scripts together into a single inventory item
 
 As scene and script complexity grows, it is often handy to be able to share code between multiple
 scripts or to define common interfaces for inter-script communication.  Or it can just be a convenient way
@@ -1200,7 +1248,7 @@ namespace MyCustomNamespace
 ```
 
 
-### How to send and receive messages between scripts
+## How to send and receive messages between scripts
 
 Scripts can communicate with other scripts using messages.  These messages are broadcast throughout the
 scene and can also include additional data.  This can be a good way to distribute scripting functionality
@@ -1265,7 +1313,7 @@ Note also that declaring the namespace allows the script to include more than on
 way to package up interdependent scripts into a single script assembly.
 
 
-### How to connect your scripts to simple scripts
+## How to connect your scripts to simple scripts
 
 Messaging to and from "Simple Scripts" is exactly the same as messaging within your own scripts with the
 added requirement of a specific data payload interface.  Simple scripts rely on this data payload to 
@@ -1399,7 +1447,7 @@ functions can be found in your Sansar client installation:
 * `C:\Program Files\Sansar\Client\ScriptApi\Examples\ScriptLibrary\LibraryBase.cs`
 
 
-### How to find other scripts in the scene
+## How to find other scripts in the scene
 
 The name of the mechanism within Sansar that allows one script to find another script within a scene is
 `Reflective`.  Once a script interface is located, the calling script can make direct function calls into
@@ -1470,7 +1518,7 @@ The `FindReflective` function reference can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
 
 
-### How to find scripts on an object
+## How to find scripts on an object
 
 In addition to the above scene-wide interface search, `ObjectPrivate` has a `FindScripts` function.
 It functions similarly and can be acccessed like so:
@@ -1487,7 +1535,7 @@ more details:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ObjectPrivate.html`
 
 
-### How to make rest API calls from script
+## How to make rest API calls from script
 
 The scripting system can communicate directly with non-Sansar servers using HTTP requests.  This
 supports `DELETE`, `GET`, `HEAD, `PATCH`, `POST` and `PUT` commands.  Although the use of HTTP 
@@ -1649,7 +1697,7 @@ The documentation around HTTP use in Sansar can be found on a few different page
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Utility\JsonSerializationData.html`
 
 
-### How to listen for trigger volume events
+## How to listen for trigger volume events
 
 Trigger volumes are special physics objects that can detect when other objects or avatars
 pass through them.  These are very handy for auto-opening doors, general detection of players
@@ -1695,7 +1743,7 @@ The documentation around this can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\RigidBodyComponent.html`
 
 
-### How to check the physics world with raycasts and shapecasts
+## How to check the physics world with raycasts and shapecasts
 
 There are a variety of raycast and shape cast options available in the scene private API.  These
 can be used to query the physics objects in the scene for navigation of script controlled NPC's or
@@ -1738,15 +1786,15 @@ physics world:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
 
 
-## Gotchas
+# Gotchas
 
-### Set functions
+## Set functions
 
-### Throttle exceptions
+## Throttle exceptions
 
 
 
-## Scripting documentation
+# Scripting documentation
 
 The full API documentation comes with the Sansar installation and should be available for most users here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\index.html`
@@ -1757,7 +1805,7 @@ These docs can be intimidating at first but once you get the hang of where to fi
 used to using them as a reference.
 
 
-### Brief summary of Sansar namespaces
+## Brief summary of Sansar namespaces
 
 The main namespaces in the Sansar scripting system are `Sansar`, `Sansar.Script` and `Sansar.Simulation`.
 
@@ -1802,7 +1850,7 @@ In addition to those, `Sansar.Simulation` also includes the following components
 * **`RigidBodyComponent`** - to adjust physics properties or apply forces or otherwise move physical objects
 
 
-### AgentPrivate vs. AgentPublic, etc.
+## AgentPrivate vs. AgentPublic, etc.
 
 If you look at the documentation you will notice that `AgentPrivate` has a corresponding `AgentPublic`
 and `ScenePrivate` has a corresponding `ScenePublic`.  These are in place for a future time when
