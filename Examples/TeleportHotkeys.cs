@@ -6,45 +6,40 @@
 
 /* This content is licensed under the terms of the Creative Commons Attribution 4.0 International License.
  * When using this content, you must:
- * •    Acknowledge that the content is from the Sansar Knowledge Base.
- * •    Include our copyright notice: "© 2017 Linden Research, Inc."
- * •    Indicate that the content is licensed under the Creative Commons Attribution-Share Alike 4.0 International License.
- * •    Include the URL for, or link to, the license summary at https://creativecommons.org/licenses/by-sa/4.0/deed.hi (and, if possible, to the complete license terms at https://creativecommons.org/licenses/by-sa/4.0/legalcode.
+ * â€¢    Acknowledge that the content is from the Sansar Knowledge Base.
+ * â€¢    Include our copyright notice: "Â© 2017 Linden Research, Inc."
+ * â€¢    Indicate that the content is licensed under the Creative Commons Attribution-Share Alike 4.0 International License.
+ * â€¢    Include the URL for, or link to, the license summary at https://creativecommons.org/licenses/by-sa/4.0/deed.hi (and, if possible, to the complete license terms at https://creativecommons.org/licenses/by-sa/4.0/legalcode.
  * For example:
- * "This work uses content from the Sansar Knowledge Base. © 2017 Linden Research, Inc. Licensed under the Creative Commons Attribution 4.0 International License (license summary available at https://creativecommons.org/licenses/by/4.0/ and complete license terms available at https://creativecommons.org/licenses/by/4.0/legalcode)."
+ * "This work uses content from the Sansar Knowledge Base. Â© 2017 Linden Research, Inc. Licensed under the Creative Commons Attribution 4.0 International License (license summary available at https://creativecommons.org/licenses/by/4.0/ and complete license terms available at https://creativecommons.org/licenses/by/4.0/legalcode)."
  */
 
 using Sansar.Script;
 using Sansar.Simulation;
 using System;
-using System.ComponentModel;
+using System.Collections.Generic;
 
 public class TeleportHotkeys : SceneObjectScript
 {
-    [Description("Hotkey to press to initiate a teleport")]
-    public string TeleportHotkey = "Key_F12";
+    [Tooltip("Hotkey to press to initiate a teleport\nDefault 'Action1' corresponds to the top-row 1 key.")]
+    public string TeleportHotkey = "Action1";
 
-    [Description("Comma separated list of experiences to visit.")]
-    public string Experiences = "mars-outpost-alpha, toppleton-toy-town, egyptian-tomb, colossus-rising, origin-cinema";
+    [Tooltip("Experiences to visit, in order.")]
+    [Entries("mars-outpost-alpha", "toppleton-toy-town", "egyptian-tomb", "colossus-rising", "origin-cinema")]
+    public List<string> Experiences;
 
-    [Description("PersonHandle which owns the experiences.")]
+    [Tooltip("PersonaHandle which owns the experiences.")]
     public string PersonaHandle = "sansar-studios";
 
     public bool TP_Everyone = false;
 
     public float TP_Delay = 0.0f;
 
-    // Parsed list of experience names
-    private string[] experiences;
-
     public override void Init()
     {
         if (TP_Delay < 0.1f) TP_Delay = 0.1f;
 
-        // Split the list into specific entries
-        experiences = Experiences.Split(new char[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-
-        if (experiences.Length == 0)
+        if (Experiences.Count == 0)
         {
             Log.Write($"No experiences found in {Experiences}");
             return;
@@ -57,58 +52,45 @@ public class TeleportHotkeys : SceneObjectScript
     {
         AgentPrivate agent = ScenePrivate.FindAgent(userId);
 
-        // Lookup the scene object for this agent
-        ObjectPrivate agentObejct = ScenePrivate.FindObject(agent.AgentInfo.ObjectId);
-        if (agentObejct == null)
+        Client client = agent?.Client;
+        if (client != null)
         {
-            Log.Write($"Unable to find a ObjectPrivate component for user {userId}");
-            return;
+            client.SubscribeToCommand(TeleportHotkey, CommandAction.Pressed, TeleportToNext, null, false);
         }
-
-        // Lookup the animation component. There should be just one, so grab the first
-        AnimationComponent animationComponent = null;
-        if (!agentObejct.TryGetFirstComponent(out animationComponent))
-        {
-            Log.Write($"Unable to find an animation component on user {userId}");
-            return;
-        }
-
-        // Listen for a key press. Since the agent will be teleporting away, do no request a persistent subscription 
-        animationComponent.Subscribe(TeleportHotkey, TeleportToNext, false);
     }
 
     void NewUser(UserData data)
     {
-        // Set up the the hotkey listener.
+        // Set up the the hot key listener.
         SubscribeToHotkey(data.User);
     }
 
-    private void TeleportToNext(AnimationData data)
+    private void TeleportToNext(CommandData data)
     {
         // Find the index of the current experience in the list
-        int index = Array.IndexOf(experiences, ScenePrivate.SceneInfo.LocationHandle);
+        int index = Experiences.IndexOf(ScenePrivate.SceneInfo.LocationHandle);
 
         // Get the next index, wrapping around. If the current location is not in the list
         // IndexOf returns -1, so the destination will be the first item in the list.
-        index = (index + 1) % experiences.Length;
+        index = (index + 1) % Experiences.Count;
 
         if (TP_Everyone == false)
         {
             // Lookup the agent
-            AgentPrivate agent = ScenePrivate.FindAgent(data.ComponentId.ObjectId);
+            AgentPrivate agent = ScenePrivate.FindAgent(data.SessionId);
             if (agent == null)
             {
-                Log.Write($"Unable to find an agent for the component {data.ComponentId}");
+                Log.Write("Unable to find user who pressed the key.");
                 return;
             }
 
             // Actually do the teleport
-            agent.Client.TeleportToLocation(PersonaHandle, experiences[index]);
+            agent.Client.TeleportToLocation(PersonaHandle, Experiences[index]);
         }
         else
         {
-            AgentPrivate agent = ScenePrivate.FindAgent(data.ComponentId.ObjectId);
-            StartCoroutine(TeleportAll, PersonaHandle, experiences[index], agent);
+            AgentPrivate agent = ScenePrivate.FindAgent(data.SessionId);
+            StartCoroutine(TeleportAll, PersonaHandle, Experiences[index], agent);
         }
     }
 

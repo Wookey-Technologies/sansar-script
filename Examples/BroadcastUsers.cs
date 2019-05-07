@@ -17,11 +17,11 @@ public class BroadcastUsers : SceneObjectScript
 
     private void OnUserJoin(UserData data)
     {
-        ScenePrivate.VoiceBroadcastStart(ScenePrivate.FindAgent(data.User));
+        ScenePrivate.SetMegaphone(ScenePrivate.FindAgent(data.User),true);
     }
 
     private void OnUserLeave(UserData data)
     {
-        ScenePrivate.VoiceBroadcastStop(ScenePrivate.FindAgent(data.User));
+        ScenePrivate.SetMegaphone(ScenePrivate.FindAgent(data.User), false);
     }
 }

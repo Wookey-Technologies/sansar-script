@@ -36,7 +36,7 @@ namespace ScriptLibrary
         [DefaultValue("<0,0,0>")]
         public readonly Vector Destination;
 
-        [Tooltip("The teleport destination forward direction within the scene. Note that avatars always remain upright so the Z component will be ignored.")]
+        [Tooltip("The teleport destination forward direction within the scene. Note that avatars always remain upright so the Z component will be ignored.\nSet to <0,0,0> to maintain the user's orientation through the teleport.")]
         [DisplayName("Destination Forward Direction")]
         [DefaultValue("<0,1,0>")]
         public readonly Vector DestinationForward;
@@ -92,8 +92,11 @@ If StartEnabled is false then the script will not respond to events until an (->
 
         Action Unsubscribes = null;
         Vector NormalizedForward;
+        bool UseAvatarRotation = false;
+
         protected override void SimpleInit()
         {
+            UseAvatarRotation = DestinationForward.LengthSquared() < 0.01f;
             NormalizedForward = (DestinationForward.LengthSquared() > 0.0f ? DestinationForward.Normalized() : Vector.Forward);
 
             if (StartEnabled) Subscribe(null);
@@ -167,20 +170,34 @@ If StartEnabled is false then the script will not respond to events until an (->
                 Vector teleportPosition = Destination;
                 Vector teleportForward = NormalizedForward;
 
-                if (RelativePosition)
-                {
-                    if (RelativeRotation)
-                        teleportPosition = ObjectPrivate.Position + Destination.Rotate(ObjectPrivate.Rotation);
-                    else
-                        teleportPosition = ObjectPrivate.Position + Destination;
-                }
-
-                if (RelativeRotation)
-                {
-                    teleportForward = NormalizedForward.Rotate(ObjectPrivate.Rotation);
-                }
-
                 AgentPrivate agent = ScenePrivate.FindAgent(sessionId);
+                if (UseAvatarRotation)
+                {
+                    if (agent != null && agent.IsValid)
+                    {
+                        ObjectPrivate agentObject = ScenePrivate.FindObject(agent.AgentInfo.ObjectId);
+                        if (agentObject != null)
+                        {
+                            teleportForward = agentObject.ForwardVector;
+                        }
+                    }
+                }
+                else
+                {
+                    if (RelativePosition)
+                    {
+                        if (RelativeRotation)
+                            teleportPosition = ObjectPrivate.Position + Destination.Rotate(ObjectPrivate.Rotation);
+                        else
+                            teleportPosition = ObjectPrivate.Position + Destination;
+                    }
+
+                    if (RelativeRotation)
+                    {
+                        teleportForward = NormalizedForward.Rotate(ObjectPrivate.Rotation);
+                    }
+                }
+
                 if (agent != null)
                 {
                     agent.Client.TeleportTo(teleportPosition, teleportForward);
