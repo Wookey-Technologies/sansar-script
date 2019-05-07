@@ -32,93 +32,50 @@ Happy scripting!
 
 # Table of contents
 
-1.[File structure for this repository](#file-structure-for-this-repository)
-
-1.[How to create a scripted experience in Sansar](#how-to-create-a-scripted-experience-in-sansar)
-
-  1.[Importing](#importing)
-
-  1.[Attaching a script to an object](#attaching-a-script-to-an-object)
-
-  1.[Building the scene](#building-the-scene)
-
-1.[Getting started with scripting](#getting-started-with-scripting)
-
-  1.[How to use the debug console](#how-to-use-the-debug-console)
-
-  1.[How to create properties that can be modified in the editor](#how-to-create-properties-that-can-be-modified-in-the-editor)
-
-    1.[Descriptions, default values, ranges and tooltips](#descriptions--default-values--ranges-and-tooltips)
-
-    1.[Limits and arrays](#limits-and-arrays)
-
-  1.[How to see text in world](#how-to-see-text-in-world)
-
-    1.[Debug console messages](#debug-console-messages)
-
-    1.[Nearby chat messages](#nearby-chat-messages)
-
-    1.[Direct messages and private messages](#direct-messages-and-private-messages)
-
-    1.[Modal dialogs](#modal-dialogs)
-
-    1.[In-world interaction text](#in-world-interaction-text)
-
-  1.[How to make something clickable (using Interaction)](#how-to-make-something-clickable-(using-interaction))
-
-  1.[How to respond to a button press](#how-to-respond-to-a-button-press)
-
-    1.[Respond to a button press for all users in a scene](#respond-to-a-button-press-for-all-users-in-a-scene)
-
-    1.[Respond to a button press only when a user is holding an object](#respond-to-a-button-press-only-when-a-user-is-holding-an-object)
-
-    1.[Using the targeting information in a command](#using-the-targeting-information-in-a-command)
-
-  1.[How to control animations](#how-to-control-animations)
-
-  1.[How to turn lights on and off](#how-to-turn-lights-on-and-off)
-
-  1.[How to control physical objects](#how-to-control-physical-objects)
-
-    1.[The thing about motion type](#the-thing-about-motion-type)
-
-  1.[How to move non-physical objects](#how-to-move-non-physical-objects)
-
-  1.[How to play sounds](#how-to-play-sounds)
-
-    1.[Audio play settings](#audio-play-settings)
-
-  1.[How to control the media source](#how-to-control-the-media-source)
-
-  1.[How to implement chat commands](#how-to-implement-chat-commands)
-
-  1.[How to put multiple scripts together into a single inventory item](#how-to-put-multiple-scripts-together-into-a-single-inventory-item)
-
-  1.[How to send and receive messages between scripts](#how-to-send-and-receive-messages-between-scripts)
-
-  1.[How to connect your scripts to simple scripts](#how-to-connect-your-scripts-to-simple-scripts)
-
-  1.[How to find other scripts in the scene](#how-to-find-other-scripts-in-the-scene)
-
-  1.[How to find scripts on an object](#how-to-find-scripts-on-an-object)
-
-  1.[How to make rest API calls from script](#how-to-make-rest-api-calls-from-script)
-
-  1.[How to listen for trigger volume events](#how-to-listen-for-trigger-volume-events)
-
-  1.[How to check the physics world with raycasts and shapecasts](#how-to-check-the-physics-world-with-raycasts-and-shapecasts)
-
-1.[Gotchas](#gotchas)
-
-  1.[Set functions](#set-functions)
-
-  1.[Throttle exceptions](#throttle-exceptions)
-
-1.[Scripting documentation](#scripting-documentation)
-
-  1.[Brief summary of Sansar namespaces](#brief-summary-of-sansar-namespaces)
-
-  1.[AgentPrivate vs. AgentPublic, etc.](#agentprivate-vs.-agentpublic,-etc.)
+1. [File structure for this repository](#file-structure-for-this-repository)
+1. [How to create a scripted experience in Sansar](#how-to-create-a-scripted-experience-in-sansar)
+  1. [Importing](#importing)
+  1. [Attaching a script to an object](#attaching-a-script-to-an-object)
+  1. [Building the scene](#building-the-scene)
+1. [Getting started with scripting](#getting-started-with-scripting)
+  1. [How to use the debug console](#how-to-use-the-debug-console)
+  1. [How to create properties that can be modified in the editor](#how-to-create-properties-that-can-be-modified-in-the-editor)
+    1. [Descriptions, default values, ranges and tooltips](#descriptions--default-values--ranges-and-tooltips)
+    1. [Limits and arrays](#limits-and-arrays)
+  1. [How to see text in world](#how-to-see-text-in-world)
+    1. [Debug console messages](#debug-console-messages)
+    1. [Nearby chat messages](#nearby-chat-messages)
+    1. [Direct messages and private messages](#direct-messages-and-private-messages)
+    1. [Modal dialogs](#modal-dialogs)
+    1. [In-world interaction text](#in-world-interaction-text)
+  1. [How to make something clickable (using Interaction)](#how-to-make-something-clickable-(using-interaction))
+  1. [How to respond to a button press](#how-to-respond-to-a-button-press)
+    1. [Respond to a button press for all users in a scene](#respond-to-a-button-press-for-all-users-in-a-scene)
+    1. [Respond to a button press only when a user is holding an object](#respond-to-a-button-press-only-when-a-user-is-holding-an-object)
+    1. [Using the targeting information in a command](#using-the-targeting-information-in-a-command)
+  1. [How to control animations](#how-to-control-animations)
+  1. [How to turn lights on and off](#how-to-turn-lights-on-and-off)
+  1. [How to control physical objects](#how-to-control-physical-objects)
+    1. [The thing about motion type](#the-thing-about-motion-type)
+  1. [How to move non-physical objects](#how-to-move-non-physical-objects)
+  1. [How to play sounds](#how-to-play-sounds)
+    1. [Audio play settings](#audio-play-settings)
+  1. [How to control the media source](#how-to-control-the-media-source)
+  1. [How to implement chat commands](#how-to-implement-chat-commands)
+  1. [How to put multiple scripts together into a single inventory item](#how-to-put-multiple-scripts-together-into-a-single-inventory-item)
+  1. [How to send and receive messages between scripts](#how-to-send-and-receive-messages-between-scripts)
+  1. [How to connect your scripts to simple scripts](#how-to-connect-your-scripts-to-simple-scripts)
+  1. [How to find other scripts in the scene](#how-to-find-other-scripts-in-the-scene)
+  1. [How to find scripts on an object](#how-to-find-scripts-on-an-object)
+  1. [How to make rest API calls from script](#how-to-make-rest-api-calls-from-script)
+  1. [How to listen for trigger volume events](#how-to-listen-for-trigger-volume-events)
+  1. [How to check the physics world with raycasts and shapecasts](#how-to-check-the-physics-world-with-raycasts-and-shapecasts)
+1. [Gotchas](#gotchas)
+  1. [Set functions](#set-functions)
+  1. [Throttle exceptions](#throttle-exceptions)
+1. [Scripting documentation](#scripting-documentation)
+  1. [Brief summary of Sansar namespaces](#brief-summary-of-sansar-namespaces)
+  1. [AgentPrivate vs. AgentPublic, etc.](#agentprivate-vs.-agentpublic,-etc.)
 
 
 # File structure for this repository
