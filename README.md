@@ -2039,7 +2039,7 @@ AgentPrivate.PerformMediaAction | 5 calls per 10 seconds
 AgentPublic.SendChat | 32 calls per 2 seconds
 ScenePrivate.Chat.MessageAllUsers | 32 calls per 2 seconds
 ScenePrivate.CreateCluster | 100 calls per second
-ScenePrivate.HttpClient.Request | 60 calls per minute
+ScenePrivate.HttpClient.Request | 10 calls per second
 ScenePrivate.OverrideAudioStream | 5 calls per 10 seconds
 ScenePrivate.OverrideMediaSource | 5 calls per 10 seconds
 ScenePrivate.PerformMediaAction | 5 calls per 10 seconds
