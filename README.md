@@ -397,6 +397,8 @@ public class ArrayPropertiesExampleScript : SceneObjectScript
     public List<int> IntValues;
     public List<float> FloatValues;
     // etc.
+
+    public override void Init() {}
 }
 ```
 
@@ -585,22 +587,28 @@ public class HeldObjectCommandScript : SceneObjectScript
             return;
         }
 
-        // Subscribe to the "Trigger" action when the object is picked up
+        if (!_rb.GetCanGrab())
+        {
+            Log.Write(LogLevel.Error, "HeldObjectCommandScript isn't on a grabbable object!");
+            return;
+        }
+
+        // Subscribe to the "PrimaryAction" action when the object is picked up
         _rb.SubscribeToHeldObject(HeldObjectEventType.Grab, (HeldObjectData holdData) =>
         {
             AgentPrivate agent = ScenePrivate.FindAgent(holdData.HeldObjectInfo.SessionId);
 
             if (agent != null && agent.IsValid)
             {
-                _commandSubscription = agent.Client.SubscribeToCommand("Trigger", CommandAction.Pressed, (CommandData command) =>
+                _commandSubscription = agent.Client.SubscribeToCommand("PrimaryAction", CommandAction.Pressed, (CommandData command) =>
                 {
                     Log.Write(agent.AgentInfo.Name + " pressed the button while holding the object!");
                 },
                 (canceledData) => { });
             }
-        }
+        });
 
-        // Unsubscribe from the "Trigger" action when the object is dropped
+        // Unsubscribe from the "PrimaryAction" action when the object is dropped
         _rb.SubscribeToHeldObject(HeldObjectEventType.Release, (HeldObjectData holdData) =>
         {
             if (_commandSubscription != null)
@@ -731,6 +739,7 @@ detect whether a light is scriptable using the `IsScriptable` flag.
 Here is a script that can safely turn a light off on an object:
 
 ```c#
+using Sansar;
 using Sansar.Script;
 using Sansar.Simulation;
 
@@ -740,9 +749,9 @@ public class LightOffScript : SceneObjectScript
     {
         LightComponent lightComp;
         if (!ObjectPrivate.TryGetFirstComponent(out lightComp))
-            Log.Write(LogLevel.Warning, "LightScript not running on an object with a light!")
+            Log.Write(LogLevel.Warning, "LightScript not running on an object with a light!");
         else if (!lightComp.IsScriptable)
-            Log.Write(LogLevel.Warning, "LightScript not running on an object with a scriptable light!")
+            Log.Write(LogLevel.Warning, "LightScript not running on an object with a scriptable light!");
         else
             lightComp.SetColorAndIntensity(Color.Black, 0.0f);  // turn the light "off"
     }
@@ -806,10 +815,10 @@ public class RigidBodyImpulseScript : SceneObjectScript
                 });
             }
             else
-                Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on a dynamic object!")
+                Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on a dynamic object!");
         }
         else
-            Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on an object with a physics volume!")
+            Log.Write(LogLevel.Warning, "RigidBodyImpulseScript not running on an object with a physics volume!");
     }
 }
 ```
@@ -903,8 +912,8 @@ public class PatrolMoverScript : SceneObjectScript
     public Vector Point3;
     public Vector Point4;
 
-    [DefaultValue(1.0f)]
-    public float MoveTime;
+    [DefaultValue(1.0)]
+    public double MoveTime;
 
     public override void Init()
     {
@@ -967,7 +976,7 @@ public class PatrolTurnMoverScript : SceneObjectScript
             ObjectPrivate.Mover.AddRotate(rotation);  // Immediately turn to face
 
             // Compute the time based on the distance and move speed
-            float moveTime = toNext.Length / MoveSpeed;
+            double moveTime = toNext.Length() / MoveSpeed;
 
             // Move the object to the next patrol point
             WaitFor(ObjectPrivate.Mover.AddTranslate, PatrolPoints[next], moveTime, MoveMode.Linear);
@@ -1016,7 +1025,7 @@ public class SoundScript : SceneObjectScript
         // Check to make sure a sound has been configured in the editor
         if (Sound == null)
         {
-            Log.Write("SoundScript has no configured sound to play!")
+            Log.Write("SoundScript has no configured sound to play!");
             return;
         }
 
@@ -1067,13 +1076,13 @@ public class LoopingSoundComponentScript : SceneObjectScript
         // Check to make sure a sound has been configured in the editor
         if (LoopingSound == null)
         {
-            Log.Write("LoopingSoundComponentScript has no configured sound to play!")
+            Log.Write("LoopingSoundComponentScript has no configured sound to play!");
             return;
         }
 
         if (!ObjectPrivate.TryGetFirstComponent(out _audio))
         {
-            Log.Write("LoopingSoundComponentScript is on an object that does not have an audio emitter.")
+            Log.Write("LoopingSoundComponentScript is on an object that does not have an audio emitter.");
             return;
         }
 
@@ -1172,7 +1181,7 @@ public class PrivateMediaSourceScript : SceneObjectScript
             {
                 agent.OverrideMediaSource(PrivateMedia);
             }
-        }
+        });
     }
 }
 ```
@@ -1203,7 +1212,7 @@ will ignore that message from any other user.
 using Sansar.Script;
 using Sansar.Simulation;
 
-public class LogGravityChatCommandScript : SceneObjectScript
+public class LowGravityChatCommandScript : SceneObjectScript
 {
     public override void Init()
     {
@@ -1252,12 +1261,12 @@ namespace MyCustomNamespace
 {
     public class Script1 : SceneObjectScript
     {
-        public override void Init();
+        public override void Init() {}
     }
 
     public class Script2 : SceneObjectScript
     {
-        public override void Init();
+        public override void Init() {}
     }
 
     // etc.
@@ -1301,20 +1310,20 @@ namespace MyCustomNamespace
     [DefaultScript]
     public class Script2 : SceneObjectScript
     {
-        public override void Init();
+        public override void Init() {}
     }
 }
 ```
 
 Another way to shorten the name that shows up in the editor by just removing the namespace is:
 
-```
+```c#
 namespace MyCustomNamespace
 {
-    [DisplayName(nameof(Script2))]
-    public class Script2 : SceneObjectScript
+    [DisplayName(nameof(Script1))]
+    public class Script1 : SceneObjectScript
     {
-        public override void Init();
+        public override void Init() {}
     }
 }
 ```
@@ -1338,6 +1347,7 @@ SubscribeToScriptEvent("my_event", (ScriptEventData data) => {});  // listen for
 A pair of script instances could use this event to make a button that turns a light off:
 
 ```c#
+using Sansar;
 using Sansar.Script;
 using Sansar.Simulation;
 
@@ -1347,12 +1357,12 @@ namespace MessagingScripts
     {
         public override void Init()
         {
-            ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, "Show media", true);
+            ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData)WaitFor(ObjectPrivate.AddInteraction, "Turn off", true);
 
             addData.Interaction.Subscribe((InteractionData data) =>
             {
                 // Send the "button_pressed" message
-                PostScriptEvent("button_pressed")
+                PostScriptEvent("button_pressed");
             });
         }
     }
@@ -1485,7 +1495,7 @@ public class SimpleSenderScript : SceneObjectScript
 
     public override void Init()
     {
-        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData) WaitFor(ObjectPrivate.AddInteraction, Title, true);
+        ObjectPrivate.AddInteractionData addData = (ObjectPrivate.AddInteractionData)WaitFor(ObjectPrivate.AddInteraction, "Turn on", true);
 
         addData.Interaction.Subscribe((InteractionData data) =>
         {
@@ -1499,7 +1509,7 @@ public class SimpleSenderScript : SceneObjectScript
             if (agent != null)
             {
                 sd.AgentInfo = agent.AgentInfo;
-                sd.ObjectInfo = agent.AgentInfo.ObjectId;
+                sd.ObjectId = agent.AgentInfo.ObjectId;
             }
 
             // Send the "on" message with the SimpleData payload
@@ -1568,7 +1578,7 @@ public class ReflectiveCallerScript : SceneObjectScript
         IButton[] buttons = ScenePrivate.FindReflective<IButton>("ReflectiveReceiverScript").ToArray();
         foreach (IButton b in buttons)
         {
-            b.SetButtonEnabled(true);
+            b.SetButtonEnabled(false);
         }
     }
 }
@@ -1691,7 +1701,8 @@ using System.Collections.Generic;
 
 public class HTTPVisitTrackerScript : SceneObjectScript
 {
-    readonly string endpoint = "https://api.my.com/api/v1/sansar_visitor_tracking";
+    [DefaultValue("https://api.my.com/api/v1/sansar_visitor_tracking")]
+    public readonly string Endpoint;
 
     public override void Init()
     {
@@ -1723,16 +1734,16 @@ public class HTTPVisitTrackerScript : SceneObjectScript
             { "sansar_uri" , ScenePrivate.SceneInfo.SansarUri },
         };
 
-        ScenePrivate.HttpClient.Request(endpoint, options, (HttpClient.RequestData data) =>
+        ScenePrivate.HttpClient.Request(Endpoint, options, (HttpClient.RequestData data) =>
         {
             if (!data.Success || data.Response.Status != 200)
             {
-                ScenePrivate.Chat.MessageAllUsers("HTTPVisitTrackerScript TrackVisit: Error");
+                ScenePrivate.Chat.MessageAllUsers("VisitTrackerScript TrackVisit: Error");
             }
         });
     }
 
-    void GetVisits(AgentPrivate agent)
+    void GetVisits()
     {
         HttpRequestOptions options = new HttpRequestOptions();
         options.Method = HttpRequestMethod.GET;
@@ -1742,7 +1753,7 @@ public class HTTPVisitTrackerScript : SceneObjectScript
             { "sansar_uri" , ScenePrivate.SceneInfo.SansarUri },
         };
 
-        ScenePrivate.HttpClient.Request(endpoint, options, (HttpClient.RequestData data) =>
+        ScenePrivate.HttpClient.Request(Endpoint, options, (HttpClient.RequestData data) =>
         {
             if (data.Success && data.Response.Status == 200)
             {
@@ -1753,7 +1764,7 @@ public class HTTPVisitTrackerScript : SceneObjectScript
             }
             else
             {
-                ScenePrivate.Chat.MessageAllUsers("GetVisits: Error");
+                ScenePrivate.Chat.MessageAllUsers("VisitTrackerScript GetVisits: Error");
             }
         });
     }
@@ -1792,7 +1803,7 @@ public class TriggerVolumeScript : SceneObjectScript
         if (ObjectPrivate.TryGetFirstComponent(out rigidBody) && rigidBody.IsTriggerVolume())
             rigidBody.Subscribe(CollisionEventType.Trigger, OnTrigger);
         else
-            Log.Write(LogLevel.Warning, "TriggerVolumeScript not running on a trigger volume!")
+            Log.Write(LogLevel.Warning, "TriggerVolumeScript not running on a trigger volume!");
     }
 
     void OnTrigger(CollisionData data)
