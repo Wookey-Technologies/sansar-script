@@ -51,7 +51,7 @@ Happy scripting!
         1. [Direct messages and private messages](#direct-messages-and-private-messages)
         1. [Modal dialogs](#modal-dialogs)
         1. [In-world interaction text](#in-world-interaction-text)
-    1. [How to make something clickable (using Interaction)](#how-to-make-something-clickable-(using-interaction))
+    1. [How to make something clickable using Interaction](#how-to-make-something-clickable-using-interaction)
     1. [How to respond to a button press](#how-to-respond-to-a-button-press)
         1. [Respond to a button press for all users in a scene](#respond-to-a-button-press-for-all-users-in-a-scene)
         1. [Respond to a button press only when a user is holding an object](#respond-to-a-button-press-only-when-a-user-is-holding-an-object)
@@ -461,7 +461,7 @@ And also interactions can have custom and changeable prompt messages that show u
 in-world.  See below for details on interaction.
 
 
-## How to make something clickable (using Interaction)
+## How to make something clickable using Interaction
 
 Objects that have an `Interaction` property will be clickable in-world by default for all users:
 
