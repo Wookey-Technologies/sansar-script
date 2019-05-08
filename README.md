@@ -999,7 +999,7 @@ For the full interface, check the API documentation in your Sansar installation:
 ## How to play sounds
 
 There are a variety of ways to play sounds in Sansar.  Sounds can be played through a specific audio emitter
-in a scene, or they can be played spatialized or non-spatialized for a target avatar for everyone in the scene.
+in a scene, or they can be played spatialized or non-spatialized for a target avatar or for everyone in the scene.
 
 Spatialized sound is sound that comes from a specific position in the world.  It is directional and may not
 be heard by avatars that are far away.  Non-spatialized sounds are played at equal volume regardless of where
