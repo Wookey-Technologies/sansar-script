@@ -1,3 +1,5 @@
+// © 2019 Linden Research, Inc.
+
 using Sansar.Script;
 using Sansar.Simulation;
 
