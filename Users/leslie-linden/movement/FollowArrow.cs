@@ -36,10 +36,10 @@ public class FollowArrow : SceneObjectScript
 
     public override void Init()
     {
-        // Write an error to the debug consoler if the object is not set to movable
+        // Write an error to the debug console if the object is not set to movable
         if (!ObjectPrivate.IsMovable)
         {
-            Log.Write($"FollowArrow script can't object {ObjectPrivate.Name} because the 'Movable from Script' flag was not set!");
+            Log.Write($"FollowArrow script can't move {ObjectPrivate.Name} because the 'Movable from Script' flag was not set!");
             return;
         }
 
