@@ -539,7 +539,7 @@ public class AllAgentsCommandScript : SceneObjectScript
 {
     public override void Init()
     {
-        // Find each user as they enter the scene and list for commands from them
+        // Find each user as they enter the scene and listen for commands from them
         ScenePrivate.User.Subscribe(User.AddUser, (UserData ud) =>
         {
             AgentPrivate agent = ScenePrivate.FindAgent(ud.User);
@@ -1016,7 +1016,7 @@ public class SoundScript : SceneObjectScript
 {
     public SoundResource Sound;
 
-    [DefaultValue(80.0f)]
+    [DefaultValue(50.0f)]
     [Range(0.0f, 100.0f)]
     public float Loudness;
 
@@ -1064,7 +1064,7 @@ public class LoopingSoundComponentScript : SceneObjectScript
 {
     public SoundResource LoopingSound;
 
-    [DefaultValue(80.0f)]
+    [DefaultValue(50.0f)]
     [Range(0.0f, 100.0f)]
     public float Loudness;
 

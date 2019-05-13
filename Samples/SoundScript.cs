@@ -7,7 +7,7 @@ public class SoundScript : SceneObjectScript
 {
     public SoundResource Sound;
 
-    [DefaultValue(80.0f)]
+    [DefaultValue(50.0f)]
     [Range(0.0f, 100.0f)]
     public float Loudness;
 

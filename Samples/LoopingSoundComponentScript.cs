@@ -7,7 +7,7 @@ public class LoopingSoundComponentScript : SceneObjectScript
 {
     public SoundResource LoopingSound;
 
-    [DefaultValue(80.0f)]
+    [DefaultValue(50.0f)]
     [Range(0.0f, 100.0f)]
     public float Loudness;
 
