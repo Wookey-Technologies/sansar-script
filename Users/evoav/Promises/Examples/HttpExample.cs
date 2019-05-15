@@ -30,25 +30,25 @@ namespace EvoExamples
     {
       Log.Write(LogLevel.Error, e.Message);
     }
-  }
-
-  class Experience 
-  {
-    public string id;
-    public string description;
-    public string name;
-    public string personaName;
-    public string uri;
-  }
-  
-  public class SansarWebApi<T> {
-    public class Meta {
-      public int page;
-      public int pages;
-      public int perPage;
-      public int total;
+    
+    class Experience 
+    {
+      public string id;
+      public string description;
+      public string name;
+      public string personaName;
+      public string uri;
     }
-    public T[] data;
-    public Meta meta;
+    
+    public class SansarWebApi<T> {
+      public class Meta {
+        public int page;
+        public int pages;
+        public int perPage;
+        public int total;
+      }
+      public T[] data;
+      public Meta meta;
+    }
   }
 }
