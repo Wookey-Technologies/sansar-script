@@ -301,16 +301,4 @@ namespace EvoAv.Promises.Http {
 
   }
 
-  
-  public class SansarWebApi<T> {
-    public class Meta {
-      public int page;
-      public int pages;
-      public int perPage;
-      public int total;
-    }
-    public T[] data;
-    public Meta meta;
-  }
-
 }
