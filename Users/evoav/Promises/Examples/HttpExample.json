@@ -1,0 +1,8 @@
+{
+  "source": [
+    "HttpExample.cs",
+    "../Promises.cs",
+    "../Utility/Dethrottler.cs",
+    "../Utility/Http.cs"
+  ]
+}
