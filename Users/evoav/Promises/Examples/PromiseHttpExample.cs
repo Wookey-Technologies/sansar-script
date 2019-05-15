@@ -5,7 +5,7 @@ using System;
 
 namespace EvoExamples 
 {
-  class HttpExample : SceneObjectScript 
+  class PromiseHttpExample : SceneObjectScript 
   {
 
     EvoAv.Promises.Http.HttpClient Client;
