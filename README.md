@@ -8,7 +8,7 @@ will find examples, samples, tutorials and more.
 Some materials are intended for people new to Sansar and new to C# while others will likely only make
 sense to seasoned developers.
 
-The easiest way to create interactive content in Sansar is to make use the built-in "Scene Scripts Library".
+The easiest way to create interactive content in Sansar is to make use of the built-in "Scene Scripts Library".
 This library was formerly referred to as "Simple Scripts" so you may notice that term used instead.
 The instructions on this page do not focus on the use of these built-in scripts, but are instead intended to
 help creators write their own scripts.
@@ -21,7 +21,7 @@ And further down on the page is an introduction to scripting in Sansar.  This as
 knowledge of modern programming principles and C# and can be quite technical at times.  But there is
 no need to fully understand all of this.  
 
-Get in and start tinkering and you will probably be able to sort out how do many things without
+Get in and start tinkering and you will probably be able to sort out how to do many things without
 needing to be an expert in C#!
 
 Also all are encouraged to ask questions and follow the `#scripting` channel in 
@@ -348,19 +348,16 @@ override the display name and define a tooltip for each property.  Here are a fe
 
     [Tooltip("The pivot point of the rotation, in object local space.")]
     [DisplayName("Object Rotation Pivot")]
-    [DefaultValue("<0,0,1>")]
+    [DefaultValue(0,0,1)]
     public Vector RotationPivot;
 
     [Tooltip("The color of the light for Mode A")]
     [DisplayName("Mode A Color")]
-    [DefaultValue("(1,0.8,0.5,1)")]
+    [DefaultValue(1,0.8,0.5,1)]
     public Sansar.Color ColorModeA;
 ```
 
-Note that the `Vector` type requires the `<>` brackets for correct default value parsing, while the
-`Color` type uses `()` parenthesis.
-
-Quaternions are also supported and they use the `[]` brackets but you most likely would want to use a 
+Quaternions are also supported but you most likely would want to use a 
 `Vector` for a rotation property and then initialize your script rotation from Euler angles since 
 typing in Quaternion does not come easily to most users.  This could be done like so:
 ```c#
