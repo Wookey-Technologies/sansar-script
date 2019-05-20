@@ -1128,6 +1128,21 @@ as needed.  This is the recommended way to set up these audio calls.
 
 Note that the `Loudness` setting is expected to be in decibels (dB) but most non-sound designers prefer to work
 in percentages so we end up doing a little math to convert from percentages to dB for the play settings.
+Here are some reference functions to do this conversion:
+
+```c#
+float LoudnessPercentToDb(float loudnessPercent)
+{
+    loudnessPercent = Math.Min(Math.Max(loudnessPercent, 0.0f), 100.0f);
+    return 60.0f * (loudnessPercent / 100.0f) - 48.0f;
+}
+
+float LoudnessDbToPercent(float loudnessDb)
+{
+    float percent = (loudnessDb + 48.0f) * 100.0f / 60.0f;
+    return Math.Min(Math.Max(percent, 0.0f), 100.0f);
+}
+```
 
 The complete documentation can be found here:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\PlaySettings.html`
