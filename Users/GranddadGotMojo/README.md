@@ -1,17 +1,13 @@
 # Sansar
 C# Code for Project Sansar
 
-This code is all written to be used in modular scripting using Simple Script and Reflex Script integration.  These scripts add to the Simple Scripts published by Linden Labs and the Reflex Scripts published by Metaverse Machines.  These scripts are all demoed in Sansar at the **Scripts Institute** Experience.
+This code is all written to be used in modular scripting using Simple Script or custom Reflective events.  These scripts add to the Simple Scripts published by Linden Labs.  .
 
 **Action Instrument** - a playable musical instrument script.
 
 **Logic Sequence Checker** = a script that checks if a stream of inputs match a certain sequence.  Can be used as a pass code or password checking mechanism.
 
 **Logic Sequence Player** - sends a series of outputs based a on a sequence you set.  Can be used to control music, lights, movement, etc.
-
-**Piano Sample Pack1V2** - defines music instruments for StandAloneInstrument.
-
-**ReflexStrobeKight** - strobe light for Sansar using Reflex Framework.
 
 **Trigger Complex Interaction** - this allows you to use a sinlge model with logical circular control surfaces to send messages based on the control surface that was interacted with.
 
