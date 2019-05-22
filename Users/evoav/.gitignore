@@ -1,0 +1,7 @@
+obj/
+bin/
+ScriptLibrary/
+Assemblies/
+Test/
+get-sansar-lib.bat
+Sansar.csproj
