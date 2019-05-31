@@ -42,26 +42,31 @@ Will be ignored if the reset motion is already in progress.")]
         [DefaultValue("<0,0,60>")]
         public readonly Vector RotationOffset;
 
-        [Tooltip("The pivot point of the rotation, in objects local space.")]
-        [DisplayName("Rotation Pivot")]
-        [DefaultValue("<0,0,0>")]
-        public readonly Vector RotationPivot;
-
         [Tooltip("The time taken to move from the base position to the offset position. The same time is used for the return motion.")]
         [DefaultValue(2.0f)]
         [DisplayName("Over time")]
         public readonly float MoveDuration;
 
-        [Tooltip("If > 0, motion will be smoothed so that it starts and ends slowly. The total duration will still be the same.")]
+        [Tooltip("Event sent when the move motion begins. Use to trigger SFX etc.")]
+        [DefaultValue("")]
+        [DisplayName("Move Began Event ->")]
+        public readonly string MoveBegan;
+
+        [Tooltip("Event sent when the move motion begins. Use to trigger SFX etc.")]
+        [DefaultValue("")]
+        [DisplayName("Return Began Event ->")]
+        public readonly string ReturnBegan;
+
+        [Tooltip("If true, motion will be smoothed so that it starts and ends slowly. The total duration will still be the same.")]
         [DisplayName("Ease In/Out")]
-        [DefaultValue(0)]
-        [Range(0f, 1f)]
-        public readonly float EaseInOut;
+        [DefaultValue(false)]
+        public readonly bool EaseInOut;
 
         [Tooltip("if true, start in the moved position.")]
         [DefaultValue(false)]
         [DisplayName("Start Moved")]
         public readonly bool StartMoved;
+
         #endregion
 
         enum State
@@ -72,142 +77,71 @@ Will be ignored if the reset motion is already in progress.")]
             Returning
         }
 
-        private RigidBodyComponent RigidBody;
+        private Sansar.Simulation.Mover mover;
         private Vector returnPosition;
         private Vector movedPosition;
 
         private Quaternion returnRotation;
         private Quaternion movedRotation;
-        private Vector worldRotationAxis;
-        private Vector localRotationAxis;
 
-        private int numTurns;
-        private int turnDirection;
-        private int turnCount;
-
-        private float translateSpeed;
-        private float rotateSpeed;
         private State state = State.Returned;
-        private Action subscriptionClose;
-        private Action subscriptionOpen;
+        private Action subscriptions;
 
-        const float precision = 0.04f;
-        const float anglePrecision = 0.001f;
-        const float timestep = 0.1f;
-        const float minimumSpeedMultipler = 0.1f;
+        const float minDuration = 0.1f;
 
         SimpleData thisObjectData;
 
-        const float PI = (float)Math.PI;
-        const float TwoPI = (float)(2.0 * Math.PI);
-
         protected override void SimpleInit()
         {
-            if (!ObjectPrivate.TryGetFirstComponent(out RigidBody))
+            if (!ObjectPrivate.IsMovable)
             {
-                Log.Write(LogLevel.Error, __SimpleTag, "Simple Mover requires a Rigidbody set to motion type Keyframed");
+                Log.Write(LogLevel.Error, "Object is not movable");
                 return;
             }
 
-            if (RigidBody.GetMotionType() != RigidBodyMotionType.MotionTypeKeyframed)
-            {
-                Log.Write(LogLevel.Error, __SimpleTag, "Simple Mover requires a Rigidbody set to motion type Keyframed");
-                return;
-            }
+            mover = ObjectPrivate.Mover;
 
             thisObjectData = new SimpleData(this);
             thisObjectData.SourceObjectId = ObjectPrivate.ObjectId;
             thisObjectData.AgentInfo = null;
             thisObjectData.ObjectId = ObjectPrivate.ObjectId;
 
-            RigidBody.SetCenterOfMass(RotationPivot);
-
-            Subscribe(null);
-
             Quaternion rotation = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * RotationOffset);
             returnRotation = ObjectPrivate.InitialRotation;
             movedRotation = returnRotation * rotation;
 
-            numTurns = (int)((RotationOffset.Length() + 179.0f) / 360f);
-
-            bool noRotation = RotationOffset.Length() < 0.5f;
-
-            if (noRotation)
-            {
-                worldRotationAxis = Vector.Up;
-            }
-            else
-            {
-                float rotationAngle;
-                GetAngleAxis(rotation, out rotationAngle, out localRotationAxis);
-
-                if (Math.Abs(rotationAngle % TwoPI) < 0.001f)
-                {
-                    // rotation axis won't be calculated correctly for exact multiple of 360 rotation
-                    // adjust euler angles slightly and re-calculate
-                    float x = RotationOffset.X;
-                    float y = RotationOffset.Y;
-                    float z = RotationOffset.Z;
-                    if (x != 0) x = Math.Sign(x) * (Math.Abs(x) - 1.0f);
-                    if (y != 0) y = Math.Sign(y) * (Math.Abs(y) - 1.0f);
-                    if (z != 0) z = Math.Sign(z) * (Math.Abs(z) - 1.0f);
-                    Vector adjustedOffset = new Vector(x, y, z);
-                    Quaternion adjustedRotation = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * adjustedOffset);
-                    float tempAngle;
-                    GetAngleAxis(adjustedRotation, out tempAngle, out localRotationAxis);
-                }
-                worldRotationAxis = localRotationAxis.Rotate(ref returnRotation);
-            }
-
-            float moveAngle = GetAngleFromZero(movedRotation);
-            rotateSpeed = Math.Abs(moveAngle + numTurns * TwoPI) / (MoveDuration * SpeedCurveAverage());
-
-            if (!noRotation)
-            {
-                Quaternion unitRotation = FromAngleAxis(1f, localRotationAxis);
-                turnDirection = Math.Sign(GetAngleFromZero(returnRotation * unitRotation));
-            }
-
-            returnPosition = ObjectPrivate.InitialPosition + RotationPivot.Rotate(ref returnRotation);
-            movedPosition = returnPosition + (PositionOffset).Rotate(ref returnRotation);
-            translateSpeed = (movedPosition - returnPosition).Length() / (MoveDuration * SpeedCurveAverage());
+            returnPosition = ObjectPrivate.InitialPosition;
+            movedPosition = returnPosition + PositionOffset.Rotate(ref returnRotation);
 
             if (StartMoved)
             {
-                RigidBody.SetOrientation(movedRotation, (e) =>
-                {
-                    SetPositionOfCOM(movedPosition);
-                });
-                turnCount = numTurns;
+                mover.StopAndClear();
+                mover.AddMove(movedPosition, movedRotation);
                 state = State.Moved;
             }
             else
             {
-                SetPositionOfCOM(returnPosition);
+                mover.StopAndClear();
+                mover.AddMove(returnPosition, returnRotation);
                 state = State.Returned;
             }
 
-            if (__SimpleDebugging)
-            {
-                Log.Write("rotation angle:" + moveAngle + " around:" + localRotationAxis + " world space axis:" + worldRotationAxis + " revolutions:" + numTurns);
-            }
+            Subscribe(null);
         }
 
         private void Subscribe(ScriptEventData sed)
         {
-            if (subscriptionClose == null)
+            if (subscriptions == null)
             {
-                subscriptionClose = SubscribeToAll(ResetEvent, (data) =>
+                subscriptions = SubscribeToAll(ResetEvent, (data) =>
                 {
                     if (state != State.Returned && state != State.Returning)
                     {
                         StartCoroutine(Return);
                     }
                 });
-            }
-            if (subscriptionOpen == null)
-            {
-                subscriptionOpen = SubscribeToAll(MoveEvent, (data) =>
+
+                subscriptions += SubscribeToAll(MoveEvent, (data) =>
                 {
                     if (state != State.Moved && state != State.Moving)
                     {
@@ -217,306 +151,54 @@ Will be ignored if the reset motion is already in progress.")]
             }
         }
 
+        private void Unsubscribe(ScriptEventData sed)
+        {
+            if (subscriptions != null)
+            {
+                subscriptions();
+                subscriptions = null;
+            }
+
+            mover.StopAndClear();
+        }
+
         void Move()
         {
-            if (MoveDuration < timestep)
+            if (MoveDuration < minDuration)
             {
-                RigidBody.SetOrientation(movedRotation, (e) =>
-                {
-                    SetPositionOfCOM(movedPosition);
-                });
+                mover.StopAndClear();
+                mover.AddMove(movedPosition, movedRotation);
                 state = State.Moved;
                 return;
             }
+
             state = State.Moving;
-            Vector fromPosition = GetPositionOfCOM();
-            Quaternion fromRotation = RigidBody.GetOrientation();
 
-            float fromAngle = GetAngleFromZero(fromRotation) + turnDirection * turnCount * TwoPI;
-            float toAngle = GetAngleFromZero(movedRotation) + turnDirection * numTurns * TwoPI;
-
-            bool translateDone = false;
-            bool rotateDone = false;
-            bool rotateWillComplete = false;
-
-            if (__SimpleDebugging)
+            mover.StopAndClear();
+            mover.AddMove(movedPosition, movedRotation, MoveDuration, EaseInOut ? MoveMode.Smoothstep : MoveMode.Linear, (e) =>
             {
-                Log.Write("Open, " + Mathf.DegreesPerRadian * fromAngle + " -> " + Mathf.DegreesPerRadian * toAngle + " axis " + worldRotationAxis + " speed " + rotateSpeed);
-            }
-
-            while (state == State.Moving)
-            {
-                if (!translateDone) ApplyTranslation(fromPosition, movedPosition, translateSpeed, ref translateDone);
-                if (!rotateDone) ApplyRotation(fromAngle, toAngle, movedRotation, rotateSpeed, ref rotateDone, ref rotateWillComplete);
-
-                if (translateDone && rotateDone)
-                {
-                    RigidBody.SetOrientation(movedRotation, (e) =>
-                    {
-                        SetPositionOfCOM(movedPosition);
-                    });
-                    state = State.Moved;
-                    break;
-                }
-                Wait(TimeSpan.FromSeconds(timestep));
-            }
+                state = State.Moved;
+            });
+            SendToAll(MoveBegan, thisObjectData);
         }
 
         void Return()
         {
-            if (MoveDuration < timestep)
+            if (MoveDuration < minDuration)
             {
-                RigidBody.SetOrientation(returnRotation, (e) =>
-                {
-                    SetPositionOfCOM(returnPosition);
-                });
-                state = State.Returned;
+                mover.StopAndClear();
+                mover.AddMove(returnPosition, returnRotation);
+                state = State.Moved;
                 return;
             }
             state = State.Returning;
-            Vector fromPosition = GetPositionOfCOM();
-            Quaternion fromRotation = RigidBody.GetOrientation();
 
-            float fromAngle = GetAngleFromZero(fromRotation) + turnCount * TwoPI;
-
-            bool translateDone = false;
-            bool rotateDone = false;
-            bool rotateWillComplete = false;
-
-            if (__SimpleDebugging)
+            mover.StopAndClear();
+            mover.AddMove(returnPosition, returnRotation, MoveDuration, EaseInOut ? MoveMode.Smoothstep : MoveMode.Linear, (e) =>
             {
-                Log.Write("Close, " + Mathf.DegreesPerRadian * fromAngle + " ->  0 " + " from turn count " + turnCount + " axis " + worldRotationAxis + " speed " + rotateSpeed);
-            }
-
-            while (state == State.Returning)
-            {
-                if (!translateDone) ApplyTranslation(fromPosition, returnPosition, translateSpeed, ref translateDone);
-                if (!rotateDone) ApplyRotation(fromAngle, 0, returnRotation, rotateSpeed, ref rotateDone, ref rotateWillComplete);
-
-                if (translateDone && rotateDone)
-                {
-                    RigidBody.SetOrientation(returnRotation, (e) =>
-                    {
-                        SetPositionOfCOM(returnPosition);
-                    });
-                    state = State.Returned;
-                    break;
-                }
-                Wait(TimeSpan.FromSeconds(timestep));
-            }
-        }
-
-        void ApplyTranslation(Vector startPosition, Vector targetPosition, float speed, ref bool isComplete)
-        {
-            Vector totalOffset = targetPosition - startPosition;
-
-            if (totalOffset.Length() <= precision)
-            {
-                isComplete = true;
-                return;
-            }
-            Vector moveDirection = totalOffset.Normalized();
-
-            Vector currentOffset = targetPosition - GetPositionOfCOM();
-            if (currentOffset.Length() < precision)
-            {
-                RigidBody.SetLinearVelocity(Vector.Zero);
-                isComplete = true;
-                return;
-            }
-
-            float distanceToTarget = moveDirection.Dot(ref currentOffset);
-
-            if (distanceToTarget < 0) // overshot
-            {
-                RigidBody.SetLinearVelocity(Vector.Zero);
-                isComplete = true;
-                return;
-            }
-
-            if (EaseInOut > 0 && MoveDuration > 4f * timestep)
-            {
-                float speedMod = SpeedCurve(distanceToTarget, (movedPosition - returnPosition).Length());
-                speed = speed * speedMod;
-            }
-
-            if (distanceToTarget < speed * timestep) // slow down if we think we will overshoot next timestep 
-            {
-                speed = distanceToTarget / timestep;
-            }
-
-            Vector velocity = speed * moveDirection;
-            RigidBody.SetLinearVelocity(velocity);
-        }
-
-
-        void ApplyRotation(float startAngle, float targetAngle, Quaternion targetRotation, float speed, ref bool isComplete, ref bool willComplete)
-        {
-            float totalAngle = targetAngle - startAngle;
-
-            if (Math.Abs(totalAngle) < anglePrecision)
-            {
-                isComplete = true;
-                return;
-            }
-
-            int sign = Math.Sign(totalAngle);
-
-            Quaternion currentRotation = RigidBody.GetOrientation();
-
-            float angleNoTurn = GetAngleFromZero(currentRotation);
-            float angle = angleNoTurn + turnDirection * turnCount * TwoPI;
-
-            float angleOffset = sign * (targetAngle - angle);
-
-            if (willComplete || Math.Abs(angleOffset) < anglePrecision)
-            {
-                RigidBody.SetAngularVelocity(Vector.Zero);
-                RigidBody.SetOrientation(targetRotation);
-                isComplete = true;
-                return;
-            }
-
-            if (angleOffset < 0) // overshot
-            {
-                RigidBody.SetAngularVelocity(Vector.Zero);
-                RigidBody.SetOrientation(targetRotation);
-                isComplete = true;
-                return;
-            }
-
-            if (EaseInOut > 0 && MoveDuration > 4f * timestep)
-            {
-                float speedMod = SpeedCurve(Math.Abs(angle), Math.Abs(GetAngleFromZero(movedRotation) + turnDirection * numTurns * TwoPI));
-                speed = speed * speedMod;
-            }
-
-            if (angleOffset < speed * timestep)
-            {
-                speed = angleOffset / timestep;
-                willComplete = true;
-            }
-
-            Vector velocity = sign * speed * worldRotationAxis;
-            RigidBody.SetAngularVelocity(velocity);
-
-            if (willComplete)
-            {
-                return;
-            }
-
-            float prediction = Math.Abs(angleNoTurn + sign * timestep * speed);
-            if (prediction >= PI || Math.Abs(angleNoTurn) > PI && prediction < PI)
-            {
-                turnCount += sign;
-            }
-        }
-
-        float SpeedCurve(float p, float totalP)
-        {
-            //       1 |     ______    
-            //         |   /        \
-            //         |  /          \
-            // minimum |_              _
-            //         |
-            //       0 |________________ totalP
-            //         ^---^       ^----^ 
-            //       rampUpLength  rampDownLength
-            if (p < 0f) p = 0f;
-            if (p > totalP) p = totalP;
-
-            float rampUpEnd = EaseInOut * totalP / 2f;
-            float rampDownStart = totalP * (1f - EaseInOut / 2f);
-
-            if (p < rampUpEnd)
-            {
-                float t = p / rampUpEnd;
-                t = t * t * (3.0f - 2.0f * t); // apply ease in/out
-                t = minimumSpeedMultipler + t * (1f - minimumSpeedMultipler);
-                return t;
-            }
-            else if (p > rampDownStart)
-            {
-                float t = 1f - (p - rampDownStart) / (totalP - rampDownStart); // 1 at start of rampdown, 0 at end (p = duration)
-                t = t * t * (3.0f - 2.0f * t); // apply ease in/out
-                t = minimumSpeedMultipler + t * (1f - minimumSpeedMultipler);
-                return t;
-            }
-
-            return 1f;
-        }
-
-        float SpeedCurveAverage()
-        {
-            float rampAverage = (1f - minimumSpeedMultipler) / 2f;
-            return EaseInOut * rampAverage + (1f - EaseInOut);
-        }
-
-        float GetAngleFromZero(Quaternion q)
-        {
-            Quaternion relative = InverseQ(returnRotation) * q;
-
-            float angle;
-            Vector axis;
-
-            GetAngleAxis(relative, out angle, out axis);
-            if (axis.Dot(ref localRotationAxis) < 0)
-            {
-                angle = -angle;
-            }
-
-            if (angle < -PI)
-            {
-                angle += TwoPI;
-            }
-            else if (angle > PI)
-            {
-                angle -= TwoPI;
-            }
-            return angle;
-        }
-
-        void SetPositionOfCOM(Vector v)
-        {
-            Vector localCOM = RigidBody.GetCenterOfMass();
-            Quaternion rot = RigidBody.GetOrientation();
-            Vector offset = localCOM.Rotate(ref rot);
-            RigidBody.SetPosition(v - offset);
-        }
-
-        Vector GetPositionOfCOM()
-        {
-            Quaternion rot = RigidBody.GetOrientation();
-            return RigidBody.GetPosition() + RotationPivot.Rotate(ref rot);
-        }
-
-        static Quaternion InverseQ(Quaternion q)
-        {
-            return new Quaternion(-q.X, -q.Y, -q.Z, q.W);
-        }
-
-        static void GetAngleAxis(Quaternion q, out float angle, out Vector axis)
-        {
-            axis = new Vector(0, 0, 1);
-            if (q.W > 1.0f || q.W < -1.0f) q = q.Normalized();
-            angle = Math.Abs(2f * (float)Math.Acos(q.W));
-            float s = (float)Math.Sqrt(1.0 - q.W * q.W);
-            if (s > 0.001f)
-            {
-                axis.X = q.X / s;
-                axis.Y = q.Y / s;
-                axis.Z = q.Z / s;
-            }
-        }
-
-        static Quaternion FromAngleAxis(float angle, Vector axis)
-        {
-            float s = (float)Math.Sin(angle / 2f);
-            float x = axis.X * s;
-            float y = axis.Y * s;
-            float z = axis.Z * s;
-            float w = (float)Math.Cos(angle / 2f);
-            return new Quaternion(x, y, z, w);
+                state = State.Returned;
+            });
+            SendToAll(ReturnBegan, thisObjectData);
         }
     }
 }

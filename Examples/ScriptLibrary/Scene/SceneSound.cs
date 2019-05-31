@@ -49,7 +49,7 @@ If true and the object does not have an AudioComponent then the sound will play 
         public readonly string PlayEvent;
 
         [Tooltip(@"The minimum loudness the sound will be played at. If less than Maximum Loudness the sound will play each time at a randomly chosen loudness between the two.")]
-        [DefaultValue(80.0f)]
+        [DefaultValue(50.0f)]
         [Range(0.0f, 100.0f)]
         [DisplayName("Loudness")]
         public readonly float Loudness;
@@ -66,8 +66,8 @@ If true and the object does not have an AudioComponent then the sound will play 
         public readonly string AdjustEvent;
 
         [Tooltip(@"Alternate playback loudness.")]
+        [DefaultValue(50.0f)]
         [Range(0.0f, 100.0f)]
-        [DefaultValue(80.0f)]
         [DisplayName("Adjusted Loudness")]
         public readonly float AdjustedLoudness;
 

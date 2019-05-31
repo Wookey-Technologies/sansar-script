@@ -30,7 +30,7 @@ namespace ScriptLibrary
         public readonly SoundResource SoundResource;
 
         [Tooltip(@"The minimum loudness the sound will be played at. If less than Maximum Loudness the sound will play each time at a randomly chosen loudness between the two.")]
-        [DefaultValue(80.0f)]
+        [DefaultValue(50.0f)]
         [Range(0.0f, 100.0f)]
         [DisplayName("Loudness")]
         public readonly float Loudness;

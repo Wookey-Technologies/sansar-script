@@ -26,7 +26,7 @@ namespace ScriptLibrary
         public readonly string MediaStreamEvent;
 
         [Tooltip(@"The loudness the stream will be played at.")]
-        [DefaultValue(80.0f)]
+        [DefaultValue(50.0f)]
         [Range(0.0f, 100.0f)]
         [DisplayName("Media Loudness")]
         public readonly float MediaStreamLoudness;
@@ -37,7 +37,7 @@ namespace ScriptLibrary
         public readonly string AudioStreamEvent;
 
         [Tooltip(@"The loudness the stream will be played at.")]
-        [DefaultValue(80.0f)]
+        [DefaultValue(50.0f)]
         [Range(0.0f, 100.0f)]
         [DisplayName("Loudness")]
         public readonly float AudioStreamLoudness;
