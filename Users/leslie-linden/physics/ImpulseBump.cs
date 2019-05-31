@@ -27,6 +27,9 @@ public class ImpulseBump : SceneObjectScript
     [DefaultValue(100.0f)]
     public float AngularForce;
 
+    [Tooltip("If this is set above zero the object will reset to its initial position after this many seconds without a bump.")]
+    public double ResetTimeout;
+
     // Privates
 
     RigidBodyComponent _rb = null;
@@ -34,6 +37,8 @@ public class ImpulseBump : SceneObjectScript
 
     bool _applyLinearImpulse = false;
     bool _applyAngularImpulse = false;
+
+    ICoroutine _resetCoroutine = null;
 
     // Logic!
 
@@ -85,6 +90,12 @@ public class ImpulseBump : SceneObjectScript
 
     void ApplyImpulse()
     {
+        if (_resetCoroutine != null)
+        {
+            _resetCoroutine.Abort();
+            _resetCoroutine = null;
+        }
+
         // Apply linear impulse force
         if (_applyLinearImpulse)
             _rb.AddLinearImpulse(LinearImpulseDirection * LinearForce);
@@ -103,5 +114,22 @@ public class ImpulseBump : SceneObjectScript
                 _rb.AddAngularImpulse(angularImpulse.Normalized() * AngularForce);
             }
         }
+
+        if ((ResetTimeout > 0.0) && (_applyLinearImpulse || _applyAngularImpulse))
+        {
+            _resetCoroutine = StartCoroutine(ResetAfterTimeout);
+        }
+    }
+
+    void ResetAfterTimeout()
+    {
+        Wait(ResetTimeout);
+
+        _rb.SetMotionType(RigidBodyMotionType.MotionTypeKeyframed);
+        _rb.SetAngularVelocity(Vector.Zero);
+        _rb.SetLinearVelocity(Vector.Zero);
+        _rb.SetPosition(ObjectPrivate.InitialPosition);
+        _rb.SetOrientation(ObjectPrivate.InitialRotation);
+        _rb.SetMotionType(RigidBodyMotionType.MotionTypeDynamic);
     }
 }
