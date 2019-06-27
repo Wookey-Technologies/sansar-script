@@ -9,6 +9,7 @@
     "SceneChatCommand.cs",
     "SceneCollisions.cs",
     "SceneDispenser.cs",
+    "SceneHintText.cs",
     "SceneHotkey.cs",
     "SceneInteraction.cs",
     "SceneKeyframedMotion.cs",

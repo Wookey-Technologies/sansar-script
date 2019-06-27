@@ -74,7 +74,7 @@ The event will be ignored the bar has already been started by this script and is
         [DisplayName("-> Disable")]
         public readonly string DisableEvent;
 
-        [Tooltip(@"If StartEnabled is true then the progress bar will be disabled when the scene is loaded.")]
+        [Tooltip(@"If StartEnabled is false then this script will not respond to event to start the progress bar until an -> Enable event is received.")]
         [DefaultValue(true)]
         [DisplayName("Start Enabled")]
         public readonly bool StartEnabled = true;

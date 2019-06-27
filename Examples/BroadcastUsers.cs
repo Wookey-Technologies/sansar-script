@@ -22,6 +22,6 @@ public class BroadcastUsers : SceneObjectScript
 
     private void OnUserLeave(UserData data)
     {
-        ScenePrivate.SetMegaphone(ScenePrivate.FindAgent(data.User), false);
+        ScenePrivate.SetMegaphone(ScenePrivate.FindAgent(data.User),false);
     }
 }
