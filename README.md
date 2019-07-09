@@ -1,4 +1,4 @@
-# sansar-script
+﻿# sansar-script
 
 Hello and welcome!
 
@@ -71,6 +71,7 @@ Happy scripting!
     1. [How to find other scripts in the scene](#how-to-find-other-scripts-in-the-scene)
     1. [How to find scripts on an object](#how-to-find-scripts-on-an-object)
     1. [How to make rest API calls from script](#how-to-make-rest-api-calls-from-script)
+    1. [How to parse JSON](#how-to-parse-json)
     1. [How to listen for trigger volume events](#how-to-listen-for-trigger-volume-events)
     1. [How to check the physics world with raycasts and shapecasts](#how-to-check-the-physics-world-with-raycasts-and-shapecasts)
 1. [Gotchas](#gotchas)
@@ -1783,7 +1784,179 @@ public class HTTPVisitTrackerScript : SceneObjectScript
 }
 ```
 
-The documentation around HTTP use in Sansar can be found on a few different pages:
+The documentation around HTTP and JSON use in Sansar can be found on a few different pages:
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpClient.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestMethod.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestOptions.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\ScenePrivate.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Utility\JsonSerializer.html`
+* `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Utility\JsonSerializationData.html`
+
+
+## How to parse JSON
+
+Many rest API calls return JSON blobs of data which can be parsed through JSON deserialization.
+The above example shows how to use a more generic structure in a simple case but it can be tricky
+to get it to work properly for a more complex example.
+
+Setting up the data structures can be finicky so we will look carefully at this 
+[fortune cookie heroku app](http://fortunecookieapi.herokuapp.com/)
+and set up a sample script to GET a fortune and parse it into the constituent pieces.
+Specifically we will use a GET request on the `/v1/cookie` endpoint like so:
+
+```c#
+private readonly string url = "http://fortunecookieapi.herokuapp.com/v1/cookie";
+
+void GetFortune()
+{
+    // Set up an HTTP GET request
+    HttpRequestOptions options = new HttpRequestOptions();
+    options.Method = HttpRequestMethod.GET;
+    options.Parameters = new Dictionary<string, string>(){ { "limit", "1" } };  // unnecessary since the default is 1 but here as reference
+
+    // Do the HTTP request
+    ScenePrivate.HttpClient.Request(url, options, (HttpClient.RequestData data) =>
+    {
+        // Check for success
+        if (data.Success && data.Response.Status == 200)
+        {
+            // Display the entire body of unparsed JSON in the debug log for reference
+            Log.Write($"Unparsed JSON:\n{data.Response.Body}\n");
+        }
+    }
+}
+```
+
+The JSON blob that is returned will look something like the following:
+
+```json
+[
+  {
+    "fortune":{"message":"Too many cooks spoil the broth.","id":"5403c81dc2fea4020029abe0"},
+    "lesson": {"english":"100,000","chinese":"十万","pronunciation":"shí-wàn","id":"5404c5404cad2502004dee54"},
+    "lotto":  {"id":"000400040023003100080005","numbers":[4,4,23,31,8,5]}
+  }
+]
+```
+
+Note this is a little unusual for the outer block to be an array (with `[]`) rather than a dictionary
+so this example has an additional complication to work through in the code.
+
+To take advantage of the JSON deserialization features you must declare classes that mirror the structure of this JSON:
+
+```c#
+public class FortuneData { public string message; public string id; }
+public class LessonData { public string english; public string chinese; public string pronunciation; public string id; }
+public class LottoData { public string id; public List<int> numbers; }
+
+public class CookieData { public FortuneData fortune; public LessonData lesson; public LottoData lotto; }
+```
+
+Note the names of the member variables need to match the names of the dictionary key entries in the JSON data itself.
+
+Lastly to parse this, we have to remember that the outer block is an array so the code will look like so:
+
+```c#
+var cookiesDefinition = WaitFor(JsonSerializer.Deserialize<CookieData[]>, data.Response.Body) as JsonSerializationData<CookieData[]>;
+CookieData[] cookiesData = cookiesDefinition.Object;
+```
+
+Once we have it in this form, the remainder of the data can be accessed like any other object.
+
+Here is a full sample that will repond to a `fortune` or `/fortune` chat command by making a GET request
+and printing the relevant info to nearby chat.
+
+```c#
+// © 2019 Linden Research, Inc.
+
+// Special thanks to NyushaZoryAna for making me aware of the rest service, the idea for this sample and help making this functional.
+
+using Sansar.Script;
+using Sansar.Simulation;
+using Sansar.Utility;
+using System;
+using System.Collections.Generic;
+
+public class HTTPFortuneJSONScript : SceneObjectScript
+{
+    private readonly string url = "http://fortunecookieapi.herokuapp.com/v1/cookie";
+
+    // The above url will return a JSON blob like this:
+    //
+    //[
+    // {
+    //  "fortune":{"message":"Too many cooks spoil the broth.","id":"5403c81dc2fea4020029abe0"},
+    //  "lesson": {"english":"100,000","chinese":"十万","pronunciation":"shí-wàn","id":"5404c5404cad2502004dee54"},
+    //  "lotto":  {"id":"000400040023003100080005","numbers":[4,4,23,31,8,5]}
+    // }
+    //]
+    //
+    // NOTE: This is a little unusual with the outer array block which makes it slightly tricky to parse.
+
+    // Define public classes with public member variables to mirror the JSON data layout
+    public class FortuneData { public string message; public string id; }
+    public class LessonData { public string english; public string chinese; public string pronunciation; public string id; }
+    public class LottoData { public string id; public List<int> numbers; }
+    public class CookieData { public FortuneData fortune; public LessonData lesson; public LottoData lotto; }
+
+    public override void Init()
+    {
+        if (!ScenePrivate.HttpClient.IsValid)
+        {
+            // In practice this should never happen but just in case...
+            Log.Write(LogLevel.Error, "HTTP client invalid!  Fortune cookie retrieval disabled.");
+            return;
+        }
+
+        // Add a chat listener to retrieve visit count when "fortune" or "/fortune" is written in chat
+        ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, (ChatData data) =>
+        {
+            if ((data.Message == "fortune") || (data.Message == "/fortune"))
+                GetFortune();
+        });
+    }
+
+    void GetFortune()
+    {
+        // Set up an HTTP GET request
+        HttpRequestOptions options = new HttpRequestOptions();
+        options.Method = HttpRequestMethod.GET;
+        options.Parameters = new Dictionary<string, string>(){ { "limit", "1" } };  // unnecessary since the default is 1 but here as reference
+
+        // Do the HTTP request
+        ScenePrivate.HttpClient.Request(url, options, (HttpClient.RequestData data) =>
+        {
+            // Check for success
+            if (data.Success && data.Response.Status == 200)
+            {
+                // Display the entire body of unparsed JSON in the debug log for reference
+                Log.Write($"Unparsed JSON:\n{data.Response.Body}\n");
+
+                // Parse the data into an array of CookieData
+                var cookiesDefinition = WaitFor(JsonSerializer.Deserialize<CookieData[]>, data.Response.Body) as JsonSerializationData<CookieData[]>;
+                CookieData[] cookiesData = cookiesDefinition.Object;
+
+                // Print the relevant fields to chat
+
+                var fortune = cookiesData[0].fortune;
+                ScenePrivate.Chat.MessageAllUsers($"Your fortune: {fortune.message}");
+
+                var lesson = cookiesData[0].lesson;
+                ScenePrivate.Chat.MessageAllUsers($"Chinese lesson: {lesson.chinese} ({lesson.pronunciation}) means {lesson.english} in English");
+
+                var lotto = cookiesData[0].lotto;
+                ScenePrivate.Chat.MessageAllUsers($"Lotto numbers: {string.Join(", ", lotto.numbers)}");
+            }
+            else
+            {
+                ScenePrivate.Chat.MessageAllUsers("HTTPFortuneJSONScript GetFortune: Error");
+            }
+        });
+    }
+}
+```
+
+The documentation around HTTP and JSON use in Sansar can be found on a few different pages:
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpClient.html`
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestMethod.html`
 * `C:\Program Files\Sansar\Client\ScriptApi\Documentation\Sansar.Simulation\HttpRequestOptions.html`
