@@ -18,7 +18,7 @@ namespace EvoAv.Promises.Http {
     public string Username;
     public string Password;
 
-    static List<Char> AllowedPlain = new List<Char>("012345678abcdefghijklmnopqrstuvwxyz.-".ToCharArray());
+    static List<Char> AllowedPlain = new List<Char>("0123456789abcdefghijklmnopqrstuvwxyz.-".ToCharArray());
     static List<string> Endcoded = new List<string> {"%25", "%3D", "%3F", "%26", "%23", "%40", "%20", "%3A", "%0A", "%09"};
     static List<string> Decoded = new List<string> {"%", "=", "?", "&", "#", "@", " ", ":", "\n", "\t"};
     public Url (string url) {
