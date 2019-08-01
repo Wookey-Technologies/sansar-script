@@ -2,7 +2,7 @@
 
 This script runs inside of an animated object that has the 37 panes in it.  The 26 letters of the alphabet, 10 numbers and a blank tile.  The animation is 37 frames long with each frame bringing a different letter/number to the front of the animation.  This script allows you to select the letter that is displayed.  
 
-![](https://github.com/mojoD/Sansar-Simple-And-Reflex-Script-Integration/blob/master/images/LetterAnimation.png)
+![](https://github.com/mojoD/Sansar-Simple-And-Reflex-Script-Integration/blob/master/images/LetterAnimaton.png)
 
 **Letter Event** - The Grouping this letter belongs to.  Like a word or row on a display screen
 
