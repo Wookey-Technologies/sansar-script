@@ -1,0 +1,14 @@
+{
+  "source": [
+    "../LibraryBase.cs",
+    "../LibraryDebugger.cs",
+    "QuestGiver.cs",
+    "QuestGiverBase.cs",
+    "QuestGiverInteraction.cs",
+    "QuestGiverTrigger.cs",
+    "QuestObject.cs",
+    "QuestObjectBase.cs",
+    "QuestObjectInteraction.cs",
+    "QuestObjectTrigger.cs"
+  ]
+}
