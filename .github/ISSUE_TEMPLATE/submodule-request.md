@@ -1,7 +1,7 @@
 ---
 name: Submodule request
 about: Create an issue to add your repository as a submodule
-title: ''
+title: Submodule request
 labels: ''
 assignees: BinahLinden
 
