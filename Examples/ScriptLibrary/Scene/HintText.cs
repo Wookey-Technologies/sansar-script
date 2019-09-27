@@ -22,10 +22,18 @@ namespace ScriptLibrary
     {
         #region EditorProperties
 
-        [Tooltip(@"The text to display.")]
+        [Tooltip("The text to display. Supports the following substitutions:"
+            + "\n{Player.Name}: The name of the player seeing the prompt."
+            + "\n{Object.Name}: The name of the object the hint script is on."
+            + "\n{Data.Source}: The name of the object containing the script that sent the event.")]
         [DefaultValue("Hello World")]
         [DisplayName("Text")]
         public readonly string TextString;
+
+        [Tooltip(@"Alternate text to display to users in VR.\nLeave empty to use the same text for all users.")]
+        [DefaultValue("")]
+        [DisplayName("VR Text")]
+        public readonly string VRTextString;
 
         [Tooltip(@"The events that will show the text for a single user. Must be events that contain agent data, e.g events sent from the Interaction Library script. Can be a comma separated list of event names.")]
         [DefaultValue("on")]
@@ -36,6 +44,11 @@ namespace ScriptLibrary
         [DefaultValue("off")]
         [DisplayName("-> Hide")]
         public readonly string HideEvent;
+
+        [Tooltip("Hint Triggers\nSet to Trigger Volumes in the scene to show the hint to any user within the trigger volume."
+            + "\n\nNote: Hints shown due to trigger volumes will ignore show/hide events, duration, and movement canceling. They will show while the user is in the volume and hide when they leave it.")]
+        [DisplayName("Hint Triggers")]
+        public List<RigidBodyComponent> Triggers;
 
         [Tooltip(@"Length of time in seconds that the text should remain on screen. If zero, the text will remain until a Hide event is received")]
         [DefaultValue(0.0)]
@@ -72,21 +85,86 @@ namespace ScriptLibrary
         const int cMaxTextLength = 80;
 
         string m_textString;
+        string m_vrTextString;
+        bool m_vrStringEnabled = false;
+        SimpleData CollisionSimpleData = null;
 
         protected override void SimpleInit()
         {
-            if (StartEnabled) Subscribe(null);
+            CollisionSimpleData = new SimpleData(this);
+            CollisionSimpleData.ObjectId = ObjectPrivate.ObjectId;
+            CollisionSimpleData.SourceObjectId = ObjectPrivate.ObjectId;
 
-            m_textString = TextString;
+            if (StartEnabled) Subscribe(null);
 
             if (TextString.Length > cMaxTextLength)
             {
                 Log.Write(LogLevel.Warning, "HintText", "TextString too long: length is " + TextString.Length + " characters, truncating to " + cMaxTextLength);
                 m_textString = TextString.Substring(0, cMaxTextLength);
             }
+            else
+            {
+                m_textString = TextString;
+            }
+
+            m_vrStringEnabled = !string.IsNullOrWhiteSpace(VRTextString);
+            if (VRTextString.Length > cMaxTextLength)
+            {
+                Log.Write(LogLevel.Warning, "HintText", "VRTextString too long: length is " + VRTextString.Length + " characters, truncating to " + cMaxTextLength);
+                m_vrTextString = VRTextString.Substring(0, cMaxTextLength);
+            }
+            else
+            {
+                m_vrTextString = VRTextString;
+            }
+
+            foreach(var trigger in Triggers)
+            {
+                if (trigger != null
+                    && trigger.IsValid
+                    && trigger.IsTriggerVolume())
+                {
+                    trigger.Subscribe(CollisionEventType.Trigger, (data) => OnCollide(data,trigger));
+                }
+            }
 
             SubscribeToAll(EnableEvent, Subscribe);
             SubscribeToAll(DisableEvent, Unsubscribe);
+        }
+
+
+        private void OnCollide(CollisionData data, RigidBodyComponent trigger)
+        {
+            if (data.Phase == CollisionEventPhase.TriggerEnter)
+            {
+                AgentPrivate agent = ScenePrivate.FindAgent(data.HitComponentId.ObjectId);
+                if (agent != null)
+                {
+                    try
+                    {
+                        CancelHideTimer(agent.AgentInfo.SessionId);
+
+                        CollisionSimpleData.SourceObjectId = trigger.ComponentId.ObjectId;
+                        if (isInVr(agent))
+                        {
+                            agent.Client.UI.HintText = GenerateHintText(m_vrTextString, agent.AgentInfo, CollisionSimpleData);
+                        }
+                        else
+                        {
+                            agent.Client.UI.HintText = GenerateHintText(m_textString, agent.AgentInfo, CollisionSimpleData);
+                        }
+                    }
+                    catch (Exception) { }
+                }
+            }
+            else if (data.Phase == CollisionEventPhase.TriggerExit)
+            {
+                AgentPrivate agent = ScenePrivate.FindAgent(data.HitComponentId.ObjectId);
+                if (agent != null)
+                {
+                    HideForSessionId(agent.AgentInfo.SessionId);
+                }
+            }
         }
 
         private void Subscribe(ScriptEventData sed)
@@ -107,6 +185,49 @@ namespace ScriptLibrary
             }
         }
 
+        private string GenerateHintText(string hint, AgentInfo info, ISimpleData data)
+        {
+            if (hint.Contains("{"))
+            {
+                hint = hint.Replace("{Player.Name}", info.Name).Replace("{Object.Name}", ObjectPrivate.Name);
+
+                ObjectPrivate source = ScenePrivate.FindObject(data.SourceObjectId);
+                if (source != null)
+                {
+                    hint = hint.Replace("{Data.Source}", source.Name);
+                }
+            }
+
+            return hint;
+        }
+
+        bool IsDifferentPos(in Sansar.Vector a, in Sansar.Vector b) { return a.X != b.X || a.Y != b.Y || a.Z != b.Z; }
+        bool IsDifferentRot(in Sansar.Quaternion a, in Sansar.Quaternion b) { return a.X != b.X || a.Y != b.Y || a.Z != b.Z || a.W != b.W; }
+
+        // This is hacky because of bugs in GetControlPoint APIs:
+        // Gaze is completely broken, never reports values.
+        // LeftTool/RightTool stay enabled once VR is entered, with the values remaining the old values outside VR
+        bool isInVr(AgentPrivate agent)
+        {
+            if (!m_vrStringEnabled) return false;
+
+            if (agent.GetControlPointEnabled(ControlPointType.GazeTarget)
+                || agent.GetControlPointEnabled(ControlPointType.RightTool)
+                || agent.GetControlPointEnabled(ControlPointType.LeftTool))
+            {
+                Sansar.Vector leftPos = agent.GetControlPointPosition(ControlPointType.LeftTool);
+                Sansar.Quaternion rightRot = agent.GetControlPointOrientation(ControlPointType.RightTool);
+                Wait(0.1);
+                if (IsDifferentPos(leftPos, agent.GetControlPointPosition(ControlPointType.LeftTool))
+                    || IsDifferentRot(rightRot, agent.GetControlPointOrientation(ControlPointType.RightTool)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void Show(ScriptEventData sed)
         {
             ISimpleData idata = sed.Data.AsInterface<ISimpleData>();
@@ -125,7 +246,15 @@ namespace ScriptLibrary
                 {
                     SessionId sessionId = agent.AgentInfo.SessionId;
                     CancelHideTimer(sessionId);
-                    agent.Client.UI.HintText = m_textString;
+
+                    if (isInVr(agent))
+                    {
+                        agent.Client.UI.HintText = GenerateHintText(m_vrTextString, agent.AgentInfo, idata);
+                    }
+                    else
+                    {
+                        agent.Client.UI.HintText = GenerateHintText(m_textString, agent.AgentInfo, idata);
+                    }
 
                     if (ShowDuration > 0.01f)
                     {

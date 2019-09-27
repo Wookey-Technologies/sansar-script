@@ -144,7 +144,7 @@ Will be ignored if the reset motion is already in progress.")]
 
             if (noRotation)
             {
-                worldRotationAxis = Vector.Up;
+                worldRotationAxis = Vector.ObjectUp;
             }
             else
             {
@@ -197,7 +197,7 @@ Will be ignored if the reset motion is already in progress.")]
                 state = State.Returned;
             }
 
-            if (__SimpleDebugging)
+            if (DebugEnabled())
             {
                 Log.Write("rotation angle:" + moveAngle + " around:" + localRotationAxis + " world space axis:" + worldRotationAxis + " revolutions:" + numTurns);
             }
@@ -249,7 +249,7 @@ Will be ignored if the reset motion is already in progress.")]
             bool rotateDone = false;
             bool rotateWillComplete = false;
 
-            if (__SimpleDebugging)
+            if (DebugEnabled())
             {
                 Log.Write("Open, " + Mathf.DegreesPerRadian * fromAngle + " -> " + Mathf.DegreesPerRadian * toAngle + " axis " + worldRotationAxis + " speed " + rotateSpeed);
             }
@@ -295,7 +295,7 @@ Will be ignored if the reset motion is already in progress.")]
             bool rotateDone = false;
             bool rotateWillComplete = false;
 
-            if (__SimpleDebugging)
+            if (DebugEnabled())
             {
                 Log.Write("Close, " + Mathf.DegreesPerRadian * fromAngle + " ->  0 " + " from turn count " + turnCount + " axis " + worldRotationAxis + " speed " + rotateSpeed);
             }

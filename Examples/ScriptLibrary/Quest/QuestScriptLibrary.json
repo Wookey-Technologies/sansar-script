@@ -1,7 +1,6 @@
 {
   "source": [
     "../LibraryBase.cs",
-    "../LibraryDebugger.cs",
     "QuestGiver.cs",
     "QuestGiverBase.cs",
     "QuestGiverInteraction.cs",

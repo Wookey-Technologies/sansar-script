@@ -27,12 +27,41 @@ namespace ScriptLibrary
 
         #endregion
 
+        HashSet<SessionId> activeSessionIds = new HashSet<SessionId>();
+
         protected override void SimpleInit()
+        {
+            var addUserSubscription = ScenePrivate.User.Subscribe(User.AddUser, OnAddUser);
+
+            // for edge case where users can join scene before AddUser subscription is added
+            foreach (var agent in ScenePrivate.GetAgents())
+            {
+                OnAddAgent(agent);
+            }
+
+            var removeUserSubscription = ScenePrivate.User.Subscribe(User.RemoveUser, (UserData data)=>
+            {
+                activeSessionIds.Remove(data.User);
+            });
+
+            if (!VerifyDefinition())
+            {
+                addUserSubscription.Unsubscribe();
+                removeUserSubscription.Unsubscribe();
+            }
+        }
+
+        bool VerifyDefinition()
         {
             if (QuestDefinition == null)
             {
                 Log.Write(LogLevel.Error, "Quest Definition not found.");
-                return;
+                return false;
+            }
+
+            if (QuestDefinition.Ready)
+            {
+                return true;
             }
 
             var update = WaitFor(QuestDefinition.Update);
@@ -40,37 +69,34 @@ namespace ScriptLibrary
             if (update.Success)
             {
                 SimpleLog(LogLevel.Info, $"Got quest definition: {QuestDefinition.Title}");
+                return true;
             }
             else
             {
                 Log.Write(LogLevel.Error, "Failed to update quest definition.");
-                return;
+                return false;
             }
-            ScenePrivate.User.Subscribe(User.AddUser, OnAddUser);
         }
 
         void OnAddUser(UserData data)
         {
             AgentPrivate agent = ScenePrivate.FindAgent(data.User);
+            OnAddAgent(agent);
+        }
 
+        void OnAddAgent(AgentPrivate agent)
+        { 
             if (agent == null || !agent.IsValid)
             {
                 return;
             }
 
-            Sansar.Simulation.Quest quest = null;
+            Quest quest = null;
             AgentInfo agentInfo = null;
 
             try
             {
                 agentInfo = agent.AgentInfo;
-
-                var questData = WaitFor(QuestDefinition.GetQuest, agentInfo.SessionId) as QuestDefinition.GetQuestData;
-                if (questData.Success)
-                {
-                    quest = questData.Quest;
-                }
-
             }
             catch
             {
@@ -78,61 +104,77 @@ namespace ScriptLibrary
                 return;
             }
 
-            if (quest != null)
+            if (!VerifyDefinition())
             {
-                SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} state: {quest.GetState()}");
+                return;
+            }
 
-                switch(quest.GetState())
+            var questData = WaitFor(QuestDefinition.GetQuest, agentInfo.SessionId) as QuestDefinition.GetQuestData;
+            if (questData.Success)
+            {
+                quest = questData.Quest;
+            }
+
+            if (quest != null && !activeSessionIds.Contains(agentInfo.SessionId))
+            {
+                try
                 {
-                    case QuestState.None:
-                        OnAgentQuestAvailable(agentInfo, quest);
-                        break;
+                    activeSessionIds.Add(agentInfo.SessionId);
+                    SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} state: {quest.GetState()}");
 
-                    case QuestState.Offered:
+                    switch (quest.GetState())
+                    {
+                        case QuestState.None:
+                            OnAgentQuestAvailable(agentInfo, quest);
+                            break;
+
+                        case QuestState.Offered:
+                            OnAgentOfferedQuest(agentInfo, quest);
+                            break;
+
+                        case QuestState.Active:
+                            OnAgentStartedQuest(agentInfo, quest);
+                            break;
+
+                        case QuestState.Completed:
+                            OnAgentCompletedQuest(agentInfo, quest);
+                            break;
+                    }
+
+                    quest.Subscribe(QuestState.Offered, (QuestData d) =>
+                    {
                         OnAgentOfferedQuest(agentInfo, quest);
-                        break;
+                    });
 
-                    case QuestState.Active:
+                    quest.Subscribe(QuestState.Active, (QuestData d) =>
+                    {
                         OnAgentStartedQuest(agentInfo, quest);
-                        break;
+                    });
 
-                    case QuestState.Completed:
+                    quest.Subscribe(QuestState.Completed, (QuestData d) =>
+                    {
                         OnAgentCompletedQuest(agentInfo, quest);
-                        break;
+                    });
+
+                    quest.Subscribe(QuestState.None, (QuestData d) =>
+                    {
+                        OnAgentResetQuest(agentInfo, quest);
+                    });
+
+                    OnAgentJoinExperience(agentInfo, quest);
                 }
-
-                quest.Subscribe(QuestState.Offered, (QuestData d) =>
-                {
-                    OnAgentOfferedQuest(agentInfo, quest);
-                });
-
-                quest.Subscribe(QuestState.Active, (QuestData d) =>
-                {
-                    OnAgentStartedQuest(agentInfo, quest);
-                });
-
-                quest.Subscribe(QuestState.Completed, (QuestData d) =>
-                {
-                    OnAgentCompletedQuest(agentInfo, quest);
-                });
-
-                quest.Subscribe(QuestState.None, (QuestData d) =>
-                {
-                    OnAgentResetQuest(agentInfo, quest);
-                });
-
-                OnAgentJoinExperience(agentInfo, quest);
+                catch (Exception) { }
             }
         }
 
         protected void OfferQuest(ScriptEventData sed)
         {
-            GetQuestFromScriptEventData(sed)?.Offer();
+            try { GetQuestFromScriptEventData(sed)?.Offer(); } catch (Exception) { }
         }
 
         protected void CompleteQuest(ScriptEventData sed)
         {
-            GetQuestFromScriptEventData(sed)?.SetState(QuestState.Completed);
+            try { GetQuestFromScriptEventData(sed)?.SetState(QuestState.Completed); } catch (Exception) { }
         }
 
         Quest GetQuestFromScriptEventData(ScriptEventData sed)
@@ -145,7 +187,7 @@ namespace ScriptLibrary
                 var questData = WaitFor(QuestDefinition.GetQuest, sessionId) as QuestDefinition.GetQuestData;
 
                 if (questData.Success)
-                 {
+                {
                     return questData.Quest;
                 }
             }
@@ -157,7 +199,7 @@ namespace ScriptLibrary
             var questData = WaitFor(QuestDefinition.GetQuest, sessionId) as QuestDefinition.GetQuestData;
             if (questData.Success)
             {
-                questData.Quest.Offer();
+                try { questData.Quest.Offer(); } catch (Exception) { }
             }
         }
 
@@ -167,27 +209,27 @@ namespace ScriptLibrary
 
         protected virtual void OnAgentQuestAvailable(AgentInfo agentInfo, Sansar.Simulation.Quest quest)
         {
-            SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Available.");
+            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Available."); } catch (Exception) { }
         }
 
         protected virtual void OnAgentOfferedQuest(AgentInfo agentInfo, Sansar.Simulation.Quest quest)
         {
-            SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Offered.");
+            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Offered."); } catch (Exception) { }
         }
 
         protected virtual void OnAgentStartedQuest(AgentInfo agentInfo, Sansar.Simulation.Quest quest)
         {
-            SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Started.");
+            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Started."); } catch (Exception) { }
         }
 
         protected virtual void OnAgentCompletedQuest(AgentInfo agentInfo, Sansar.Simulation.Quest quest)
         {
-            SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Completed.");
+            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Completed."); } catch (Exception) { }
         }
 
         protected virtual void OnAgentResetQuest(AgentInfo agentInfo, Sansar.Simulation.Quest quest)
         {
-            SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Reset.");
+            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {quest.Definition.Title} Reset."); } catch (Exception) { }
         }
 
         protected SimpleData GetEventData(AgentInfo agentInfo)

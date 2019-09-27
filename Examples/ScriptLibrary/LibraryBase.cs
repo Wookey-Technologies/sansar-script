@@ -17,6 +17,7 @@ using System.Linq;
 [assembly: Tooltip("A collection of scripts that work together through named events to do common simple scripting tasks.\nEvents that start with -> respond to event names by doing something.\nEvents that end with -> will send an event after something is done.")]
 namespace ScriptLibrary 
 {
+    // Adding any data to this will mean messages from old scripts will fail to be processed correctly in new scripts.
     public interface ISimpleData
     {
         AgentInfo AgentInfo { get; }
@@ -46,7 +47,7 @@ namespace ScriptLibrary
             Events = eventChain.First().Trim().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < Events.Length; ++i)
             {
-                Events[i] = GenerateEventName(Events[i], script.GetGroup());
+                Events[i] = GenerateEventName(Events[i], script.GetGroup(), script.GetObjectId());
             }
 
             if (eventChain.Count() > 1)
@@ -55,24 +56,21 @@ namespace ScriptLibrary
             }
         }
 
-        private string GenerateEventName(string eventName, string group)
+        private string GenerateEventName(string eventName, string group, ObjectId objectId)
         {
             eventName = eventName.Trim();
             if (eventName.EndsWith("@"))
             {
                 // Special case on@ to send the event globally (the null group) by sending w/o the @.
-                return eventName.Substring(0, eventName.Length - 1);
+                eventName = eventName.Substring(0, eventName.Length - 1);
             }
-            else if (group == "" || eventName.Contains("@"))
+            else if (group != "" && !eventName.Contains("@"))
             {
-                // No group was set or already targeting a specific group as is.
-                return eventName;
+                // Append the group if there is a group and there isn't a group override set
+                eventName = eventName + "@" + group;
             }
-            else
-            {
-                // Append the group
-                return eventName + "@" + group;
-            }
+
+            return eventName.Replace("{object}", "{o:" + objectId + "}");
         }
 
         internal string[] Events;
@@ -88,7 +86,7 @@ namespace ScriptLibrary
             Head = new EventCollection(eventCsv.Split(new string[] { ">>" }, StringSplitOptions.RemoveEmptyEntries), script);
         }
 
-        internal void SendToAll(SimpleData data)
+        internal void SendToAll(Reflective data)
         {
             Next();
 
@@ -124,10 +122,11 @@ namespace ScriptLibrary
                     Current.Unsubscribe += sub.Unsubscribe;
                 }
             }
+            Current.Unsubscribe += () => ThisScript.UnsubscribeToSimpleEvent(Current.Events.Length);
             return Current.Unsubscribe;
         }
 
-        private void Next()
+        public void Next()
         {
             if (Current != null && Current.Unsubscribe != null)
             {
@@ -148,7 +147,7 @@ namespace ScriptLibrary
                 Current.Unsubscribe = null;
             }
 
-            Current = Head;
+            Current = null;
         }
 
         private readonly IBase ThisScript = null;
@@ -160,166 +159,147 @@ namespace ScriptLibrary
     {
         void SimpleLog(LogLevel level, string logMessage);
         string GetGroup();
+        ObjectId GetObjectId();
         bool DebugEnabled();
 
-        void PostSimpleEvent(string name, SimpleData data);
+        void PostSimpleEvent(string name, Reflective data);
 
         IEventSubscription SubscribeToSimpleEvent(string Message, Action<ScriptEventData> callback);
-
+        void UnsubscribeToSimpleEvent(int eventCount);
     }
 
     public interface IDebug
     {
         bool DebugSimple { get; }
+        void TrackSubscribe(string name, int count = 1);
+        bool TrackingSubscriptions { get; }
     }
 
-    [Tooltip("Requires a scene object - will not work on rezzed objects.")]
-    public abstract class SceneObjectBase : SceneObjectScript, IBase
+    public class DebugDisabled : IDebug
+    {
+        public bool DebugSimple { get { return false; } }
+        public void TrackSubscribe(string name, int count = 1) { }
+        public bool TrackingSubscriptions { get { return false; } }
+    }
+
+    public abstract class LibraryBase : SceneObjectScript, IBase
     {
         [Tooltip(@"If a Group is set, will only respond and send to other SimpleScripts with the same Group tag set.
 Does NOT accept CSV lists of groups.
+Use {object} as the group to create a group that is unique to this object.
 To send or receive events to/from a specific group from outside that group append an @ and the group name to the event name, e.g. ""on@my_group""")]
         [DefaultValue("")]
         [DisplayName("Group")]
         public string Group = "";
 
-        internal bool __SimpleDebugging = false;
+        internal IDebug __SimpleDebugger = new DebugDisabled();
         internal string __SimpleTag = "";
 
         #region IBase
         public void SimpleLog(LogLevel level, string logMessage)
         {
-            if (__SimpleDebugging) Log.Write(level, __SimpleTag, logMessage);
+            if (level == LogLevel.Error || __SimpleDebugger.DebugSimple) Log.Write(level, __SimpleTag, logMessage);
         }
         public string GetGroup() { return Group; }
-        public bool DebugEnabled() { return __SimpleDebugging; }
+        public ObjectId GetObjectId() { return ObjectPrivate.ObjectId; }
+        public bool DebugEnabled() { return __SimpleDebugger.DebugSimple; }
 
-        public void PostSimpleEvent(string name, SimpleData data)
+        public void PostSimpleEvent(string name, Reflective data)
         {
             PostScriptEvent(name, data);
         }
 
         public IEventSubscription SubscribeToSimpleEvent(string Message, Action<ScriptEventData> callback)
         {
+            if (__SimpleDebugger.TrackingSubscriptions) __SimpleDebugger.TrackSubscribe(ObjectPrivate.Name);
             return base.SubscribeToScriptEvent(Message, callback);
+        }
+
+        public void UnsubscribeToSimpleEvent(int eventCount)
+        {
+            if (__SimpleDebugger.TrackingSubscriptions) __SimpleDebugger.TrackSubscribe(ObjectPrivate.Name, eventCount * -1);
         }
         #endregion
 
         protected abstract void SimpleInit();
+        bool foundDebugger = false;
 
         public sealed override void Init()
         {
             __SimpleTag = GetType().Name + " [S:" + Script.ID.ToString() + " O:" + ObjectPrivate.ObjectId.ToString() + "]";
-            Wait(TimeSpan.FromSeconds(1));
-            IDebug debugger = ScenePrivate.FindReflective<IDebug>("Simple.Debugger").FirstOrDefault();
-            if (debugger != null) __SimpleDebugging = debugger.DebugSimple;
+            StartCoroutine(FindDebugger, 0.1);
+            Yield();
+
+            int retries = 15;
+            while (!foundDebugger && --retries > 0) Wait(0.1);
 
             SimpleInit();
         }
 
-        private Dictionary<string, EventWrapper> EventWrappers = new Dictionary<string, EventWrapper>();
+        private void FindDebugger(double rate)
+        {
+            int retries = 10;
+            IDebug debugger = null;
+            do
+            {
+                debugger = ScenePrivate.FindReflective<IDebug>("Simple.Debugger").FirstOrDefault();
+                if (debugger == null) Wait(rate);
+            } while (debugger == null && --retries > 0);
 
-        private EventWrapper GetWrapper(string events)
+            if (debugger != null)
+            {
+                __SimpleDebugger = debugger;
+                return;
+            }
+
+            if (rate < 3.0)
+            {
+                StartCoroutine(() =>
+                {
+                    FindDebugger(rate * 2);
+                });
+            }
+        }
+
+        private Dictionary<string, EventWrapper> SendEventWrappers = new Dictionary<string, EventWrapper>();
+        private Dictionary<string, EventWrapper> SubscribeEventWrappers = new Dictionary<string, EventWrapper>();
+
+        private EventWrapper GetWrapper(Dictionary<string, EventWrapper> eventWrappers, string events)
         {
             if (string.IsNullOrWhiteSpace(events)) return null;
 
             EventWrapper wrapper;
-            if (!EventWrappers.TryGetValue(events, out wrapper))
+            if (!eventWrappers.TryGetValue(events, out wrapper))
             {
                 wrapper = new EventWrapper(events, this);
-                EventWrappers[events] = wrapper;
+                eventWrappers[events] = wrapper;
             }
             return wrapper;
         }
 
-        protected void SendToAll(string csv, SimpleData data)
+        protected void SendToAll(string csv, Reflective data)
         {
-            GetWrapper(csv)?.SendToAll(data);
+            GetWrapper(SendEventWrappers, csv)?.SendToAll(data);
         }
 
         protected Action SubscribeToAll(string csv, Action<ScriptEventData> callback)
         {
-            return GetWrapper(csv)?.SubscribeToAll(callback);
+            return GetWrapper(SubscribeEventWrappers, csv)?.SubscribeToAll(callback);
         }
 
-        protected void Reset(string csv)
+        protected void ResetSendState(string csv)
         {
-            GetWrapper(csv)?.Reset();
-        }
-    }
-
-    [Tooltip("Will work on objects rezzed or built into the scene.")]
-    public abstract class ObjectBase : ObjectScript, IBase
-    {
-        [Tooltip(@"If a Group is set, will only respond and send to other SimpleScripts with the same Group tag set.
-Does NOT accept CSV lists of groups.
-To send or receive events to/from a specific group from outside that group append an @ and the group name to the event name, e.g. ""on@my_group""")]
-        [DefaultValue("")]
-        [DisplayName("Group")]
-        public string Group = "";
-
-        internal bool __SimpleDebugging = false;
-        internal string __SimpleTag = "";
-
-        #region IBase
-        public void SimpleLog(LogLevel level, string logMessage)
-        {
-            if (__SimpleDebugging) Log.Write(level, __SimpleTag, logMessage);
-        }
-        public string GetGroup() { return Group; }
-        public bool DebugEnabled() { return __SimpleDebugging; }
-
-        public void PostSimpleEvent(string name, SimpleData data)
-        {
-            PostScriptEvent(name, data);
+            GetWrapper(SendEventWrappers, csv)?.Reset();
         }
 
-        public IEventSubscription SubscribeToSimpleEvent(string Message, Action<ScriptEventData> callback)
+        protected void NextSendState(string csv)
         {
-            return base.SubscribeToScriptEvent(Message, callback);
-        }
-        #endregion
-
-        protected abstract void SimpleInit();
-
-        public sealed override void Init()
-        {
-            __SimpleTag = GetType().Name + " [S:" + Script.ID.ToString() + " O:" + ObjectPrivate.ObjectId.ToString() + "]";
-            Wait(TimeSpan.FromSeconds(1));
-            IDebug debugger = ScenePublic.FindReflective<IDebug>("Simple.Debugger").FirstOrDefault();
-            if (debugger != null) __SimpleDebugging = debugger.DebugSimple;
-
-            SimpleInit();
+            GetWrapper(SendEventWrappers, csv)?.Next();
         }
 
-        private Dictionary<string, EventWrapper> EventWrappers = new Dictionary<string, EventWrapper>();
-
-        private EventWrapper GetWrapper(string events)
+        protected void ResetSubscribeState(string csv)
         {
-            if (string.IsNullOrWhiteSpace(events)) return null;
-
-            EventWrapper wrapper;
-            if (!EventWrappers.TryGetValue(events, out wrapper))
-            {
-                wrapper = new EventWrapper(events, this);
-                EventWrappers[events] = wrapper;
-            }
-            return wrapper;
-        }
-
-        protected void SendToAll(string csv, SimpleData data)
-        {
-            GetWrapper(csv)?.SendToAll(data);
-        }
-
-        protected Action SubscribeToAll(string csv, Action<ScriptEventData> callback)
-        {
-            return GetWrapper(csv)?.SubscribeToAll(callback);
-        }
-
-        protected void Reset(string csv)
-        {
-            GetWrapper(csv)?.Reset();
+            GetWrapper(SubscribeEventWrappers, csv)?.Reset();
         }
     }
 }

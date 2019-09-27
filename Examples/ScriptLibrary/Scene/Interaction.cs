@@ -16,9 +16,9 @@ using System.Linq;
 namespace ScriptLibrary
 {
     [Tooltip("Sends simple script events in response to interactions.")]
-    [DisplayName(nameof(Interaction))]
+    [DisplayName("Interaction")]
     [DefaultScript]
-    public class Interaction : LibraryBase
+    public class InteractionManager : LibraryBase
     {
         #region EditorProperties
         [Tooltip(@"The interaction for this object, with a default prompt of ""Click Me!""")]
@@ -29,7 +29,7 @@ namespace ScriptLibrary
         [Tooltip(@"The events to send when the object is clicked. Can be a comma separated list of event names.
 To send different events on subsequent clicks use the >> sequence operator like: on>>off.")]
         [DefaultValue("on>>off")]
-        [DisplayName("On Click ->")]
+        [DisplayName("This Click ->")]
         public readonly string OnClick;
 
         [Tooltip("Maximum number of events per second that will trigger events. Set to 0 for no limit.")]
@@ -45,8 +45,94 @@ To send different events on subsequent clicks use the >> sequence operator like:
 
         [Tooltip("Reset this script so the next click will be 1st click.")]
         [DefaultValue("interaction_reset")]
-        [DisplayName("-> Reset Count")]
+        [DisplayName("-> Reset")]
         public readonly string ResetEvent;
+
+        [Tooltip("Advance to the next state, if sequences '>>' are used, as if the button was clicked but without sending the events.")]
+        [DefaultValue("interaction_next")]
+        [DisplayName("-> Next")]
+        public readonly string NextEvent;
+
+        [Tooltip(@"Set to a volume to add an Interaction to the object the volume is on.
+Only one interaction can work on a single object.
+All Interactions set on this script will follow the same configuration.")]
+        [DisplayName("Volume1")]
+        public readonly RigidBodyComponent Volume1;
+
+        [Tooltip(@"The interaction prompt for Volume 1.")]
+        [DefaultValue("Click 1!")]
+        [DisplayName("Volume 1 prompt")]
+        public readonly string Volume1Prompt;
+
+        [Tooltip(@"The events to send when Volume1 is clicked. Can be a comma separated list of event names.
+To send different events on subsequent clicks use the >> sequence operator like: on>>off.")]
+        [DefaultValue("on>>off")]
+        [DisplayName("Volume 1 ->")]
+        public readonly string Volume1OnClick;
+
+        [Tooltip("Reset Volume 1 so the next click will be 1st click.")]
+        [DefaultValue("interaction_reset")]
+        [DisplayName("-> Reset 1")]
+        public readonly string Reset1;
+
+        [Tooltip("Advance Volume 1 to the next state, if sequences '>>' are used, as if the button was clicked but without sending the events.")]
+        [DefaultValue("interaction_next")]
+        [DisplayName("-> Next 1")]
+        public readonly string Next1;
+
+        [Tooltip(@"Set to a volume to add an Interaction to the object the volume is on.
+Only one interaction can work on a single object.
+All Interactions set on this script will follow the same configuration.")]
+        [DisplayName("Volume 2")]
+        public readonly RigidBodyComponent Volume2;
+
+        [Tooltip(@"The interaction prompt for Volume 2.")]
+        [DefaultValue("Click 2!")]
+        [DisplayName("Volume 2 prompt")]
+        public readonly string Volume2Prompt;
+
+        [Tooltip(@"The events to send when Volume 2 is clicked. Can be a comma separated list of event names.
+To send different events on subsequent clicks use the >> sequence operator like: on>>off.")]
+        [DefaultValue("on>>off")]
+        [DisplayName("Volume 2 ->")]
+        public readonly string Volume2OnClick;
+
+        [Tooltip("Reset Volume 2 so the next click will be 1st click.")]
+        [DefaultValue("interaction_reset")]
+        [DisplayName("-> Reset 2")]
+        public readonly string Reset2;
+
+        [Tooltip("Advance Volume 2 to the next state, if sequences '>>' are used, as if the button was clicked but without sending the events.")]
+        [DefaultValue("interaction_next")]
+        [DisplayName("-> Next 2")]
+        public readonly string Next2;
+
+        [Tooltip(@"Set to a volume to add an Interaction to the object the volume is on.
+Only one interaction can work on a single object.
+All Interactions set on this script will follow the same configuration.")]
+        [DisplayName("Volume 3")]
+        public readonly RigidBodyComponent Volume3;
+
+        [Tooltip(@"The interaction prompt for Volume 3.")]
+        [DefaultValue("Click 3!")]
+        [DisplayName("Volume 3 prompt")]
+        public readonly string Volume3Prompt;
+
+        [Tooltip(@"The events to send when Volume 3 is clicked. Can be a comma separated list of event names.
+To send different events on subsequent clicks use the >> sequence operator like: on>>off.")]
+        [DefaultValue("on>>off")]
+        [DisplayName("Volume 3 ->")]
+        public readonly string Volume3OnClick;
+
+        [Tooltip("Reset Volume 3 so the next click will be 1st click.")]
+        [DefaultValue("interaction_reset")]
+        [DisplayName("-> Reset 3")]
+        public readonly string Reset3;
+
+        [Tooltip("Advance Volume 3 to the next state, if sequences '>>' are used, as if the button was clicked but without sending the events.")]
+        [DefaultValue("interaction_next")]
+        [DisplayName("-> Next 3")]
+        public readonly string Next3;
 
         [Tooltip("Enable responding to events for this script")]
         [DefaultValue("interaction_enable")]
@@ -65,6 +151,7 @@ If StartEnabled is false then the script will not respond to interactions until 
         public readonly bool StartEnabled = true;
         #endregion
 
+        Action<bool> EnableAll = null;
         protected override void SimpleInit()
         {
             // Any \n put in the parameter will not get converted to newlines, so convert them here.
@@ -74,41 +161,80 @@ If StartEnabled is false then the script will not respond to interactions until 
                 MyInteraction.SetPrompt(prompt.Replace("\\n", "\n"));
             }
 
-            if (!StartEnabled) MyInteraction.SetEnabled(false);
-
-            SubscribeToAll(DisableEvent, (data) => { MyInteraction.SetEnabled(false); });
-            SubscribeToAll(EnableEvent, (data) => { MyInteraction.SetEnabled(true); });
+            SubscribeToAll(DisableEvent, (data) => { EnableAll(false);  });
+            SubscribeToAll(EnableEvent, (data) => { EnableAll(true); });
             SubscribeToAll(ResetEvent, (data) => { ResetSendState(OnClick); });
+            SubscribeToAll(NextEvent, (data) => { NextSendState(OnClick); });
 
-                if (MaxEventsPerSecond >= 100 || MaxEventsPerSecond <= 0)
+            StartCoroutine(SetupInteraction, MyInteraction, OnClick);
+
+            StartCoroutine(AddInteraction, Volume1, Volume1Prompt, Volume1OnClick);
+            SubscribeToAll(Reset1, (data) => { ResetSendState(Volume1OnClick); });
+            SubscribeToAll(Next1, (data) => { NextSendState(Volume1OnClick); });
+
+            StartCoroutine(AddInteraction, Volume2, Volume2Prompt, Volume2OnClick);
+            SubscribeToAll(Reset2, (data) => { ResetSendState(Volume2OnClick); });
+            SubscribeToAll(Next2, (data) => { NextSendState(Volume2OnClick); });
+
+            StartCoroutine(AddInteraction, Volume3, Volume3Prompt, Volume3OnClick);
+            SubscribeToAll(Reset3, (data) => { ResetSendState(Volume3OnClick); });
+            SubscribeToAll(Next3, (data) => { NextSendState(Volume3OnClick); });
+        }
+
+        private void AddInteraction(RigidBodyComponent volume, string prompt, string events)
+        {
+            if (volume != null && volume.IsValid)
+            {
+                ObjectPrivate op = ScenePrivate.FindObject(volume.ComponentId.ObjectId);
+                if (op != null)
                 {
-                    MyInteraction.Subscribe((InteractionData data) =>
+                    var result = WaitFor(op.AddInteraction, prompt.Replace("\\n", "\n"), StartEnabled) as ObjectPrivate.AddInteractionData;
+                    if (result.Success)
                     {
-                        if (DisableOnClick) MyInteraction.SetEnabled(data.AgentId, false);
-
-                        SimpleData sd = new SimpleData(this);
-                        sd.SourceObjectId = ObjectPrivate.ObjectId;
-                        sd.AgentInfo = ScenePrivate.FindAgent(data.AgentId)?.AgentInfo;
-                        sd.ObjectId = sd.AgentInfo != null ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
-                        SendToAll(OnClick, sd);
-                    });
-                }
-                else
-                {
-                    TimeSpan waitTime = TimeSpan.FromSeconds(1.0 / MaxEventsPerSecond);
-                    while (true)
+                        SetupInteraction(result.Interaction, events);
+                    }
+                    else
                     {
-                        InteractionData data = (InteractionData)WaitFor(MyInteraction.Subscribe);
-                        if (DisableOnClick) MyInteraction.SetEnabled(data.AgentId, false);
-
-                        SimpleData sd = new SimpleData(this);
-                        sd.SourceObjectId = ObjectPrivate.ObjectId;
-                        sd.AgentInfo = ScenePrivate.FindAgent(data.AgentId)?.AgentInfo;
-                        sd.ObjectId = sd.AgentInfo != null ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
-                        SendToAll(OnClick, sd);
-                        Wait(waitTime);
+                        SimpleLog(LogLevel.Error, "Unable to add Interaction to object " + op.Name + ": " + result.Message);
                     }
                 }
+            }
+        }
+
+        private void SetupInteraction(Interaction interaction, string events)
+        {
+            EnableAll += interaction.SetEnabled;
+            interaction.SetEnabled(StartEnabled);
+
+            if (MaxEventsPerSecond >= 100 || MaxEventsPerSecond <= 0)
+            {
+                interaction.Subscribe((InteractionData data) =>
+                {
+                    if (DisableOnClick) interaction.SetEnabled(data.AgentId, false);
+
+                    SimpleData sd = new SimpleData(this);
+                    sd.SourceObjectId = ObjectPrivate.ObjectId;
+                    sd.AgentInfo = ScenePrivate.FindAgent(data.AgentId)?.AgentInfo;
+                    sd.ObjectId = sd.AgentInfo != null ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
+                    SendToAll(events, sd);
+                });
+            }
+            else
+            {
+                TimeSpan waitTime = TimeSpan.FromSeconds(1.0 / MaxEventsPerSecond);
+                while (true)
+                {
+                    InteractionData data = (InteractionData)WaitFor(interaction.Subscribe);
+                    if (DisableOnClick) interaction.SetEnabled(data.AgentId, false);
+
+                    SimpleData sd = new SimpleData(this);
+                    sd.SourceObjectId = ObjectPrivate.ObjectId;
+                    sd.AgentInfo = ScenePrivate.FindAgent(data.AgentId)?.AgentInfo;
+                    sd.ObjectId = sd.AgentInfo != null ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
+                    SendToAll(events, sd);
+                    Wait(waitTime);
+                }
+            }
         }
     }
 }

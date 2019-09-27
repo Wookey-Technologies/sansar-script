@@ -67,7 +67,7 @@ public class MoverExample2 : ObjectScript
                 double timeForRotation = Math.Abs(rotationAngle / Mathf.TwoPi) / SpinSpeed;
 
                 // Compute a quaternion to rotate the object around the up axis by the specified angle
-                Quaternion rotation = Quaternion.FromAngleAxis(rotationAngle, Vector.Up);
+                Quaternion rotation = Quaternion.FromAngleAxis(rotationAngle, Vector.ObjectUp);
 
                 // Do the actual rotation, and wait for it to complete
                 WaitFor(ObjectPrivate.Mover.AddRotate, rotation, timeForRotation, MoveMode.Smoothstep);
@@ -110,10 +110,10 @@ public class MoverExample2 : ObjectScript
                 // Even if you don't fully understand that, you can see how it works below.  All of the rotations are queue'd up even though we call them
                 // one after the other and then we just wait on the final one to finish before switching directions and spinning the other way.
 
-                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 1.0f / 6.0f, Vector.Up), timeForOneRotation * 0.25, MoveMode.EaseIn);
-                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 3.0f / 6.0f, Vector.Up), timeForOneRotation * 0.25, MoveMode.Linear);
-                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 5.0f / 6.0f, Vector.Up), timeForOneRotation * 0.25, MoveMode.Linear);
-                WaitFor(ObjectPrivate.Mover.AddRotate,      Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi, Vector.Up), timeForOneRotation * 0.25, MoveMode.EaseOut);
+                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 1.0f / 6.0f, Vector.ObjectUp), timeForOneRotation * 0.25, MoveMode.EaseIn);
+                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 3.0f / 6.0f, Vector.ObjectUp), timeForOneRotation * 0.25, MoveMode.Linear);
+                ObjectPrivate.Mover.AddRotate(Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi * 5.0f / 6.0f, Vector.ObjectUp), timeForOneRotation * 0.25, MoveMode.Linear);
+                WaitFor(ObjectPrivate.Mover.AddRotate,      Quaternion.FromAngleAxis(nextSpinSign * Mathf.TwoPi, Vector.ObjectUp), timeForOneRotation * 0.25, MoveMode.EaseOut);
 
                 nextSpinSign *= -1.0f;
             }

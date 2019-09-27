@@ -113,7 +113,7 @@ namespace ScriptLibrary
                 simpleData.AgentInfo = holdingAgent;
                 simpleData.ObjectId = holdingAgent.ObjectId;
 
-                unsubscribe = agent.Client.SubscribeToCommand(SelectCommand, OnSelect, (d) => { }).Unsubscribe;
+                unsubscribe = agent.Client.SubscribeToCommand(SelectCommand, OnSelect, null).Unsubscribe;
             }
             catch (System.Exception)
             {

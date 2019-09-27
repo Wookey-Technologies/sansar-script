@@ -22,94 +22,295 @@ namespace ScriptLibrary
     public class QuestObjectTriggerVolume : QuestObjectBase
     {
         #region EditorProperties
-        [Tooltip(@"Events to send when a user starts the objective. Can be a comma separated list of event names.")]
-        [DefaultValue("isActive")]
-        [DisplayName("On Activate ->")]
-        public readonly string ActivatedEvent;
+        [Tooltip(@"The objective definition.")]
+        [DisplayName("Objective")]
+        public readonly ObjectiveDefinition _ObjectiveDefinition;
+        protected override ObjectiveDefinition ObjectiveDefinition => _ObjectiveDefinition;
 
-        [Tooltip(@"Events to send when the objective is locked. Can be a comma separated list of event names.")]
-        [DefaultValue("isLocked")]
-        [DisplayName("On Locked ->")]
-        public readonly string LockedEvent;
+        [Tooltip("Add Trigger Volume references from the scene for them to act as Objectives identical to this one.")]
+        [DisplayName("Extra Objectives")]
+        public List<RigidBodyComponent> TriggerObjectives;
 
-        [Tooltip(@"Events to send when a user completes the objective. Can be a comma separated list of event names.")]
-        [DefaultValue("isComplete")]
-        [DisplayName("On Complete ->")]
-        public readonly string CompletedEvent;
+        [Tooltip("Hint Text\nThe text to display to users that are inside any Hint Volumes")]
+        [DisplayName("Hint Text")]
+        public readonly string HintText;
 
-        [Tooltip("Enable responding to events for this script")]
-        [DefaultValue("trigger_enable")]
-        [DisplayName("-> Enable")]
-        public readonly string EnableEvent;
+        [Tooltip("Hint Volumes"
+            + "\nAdd Trigger Volumes in the scene for areas to show hints"
+            + "\nIf the number of Hint Volumes matches Extra Objectives + this objective then the hint will enable/disable with the corresponding objective.")]
+        [DisplayName("Hint Volumes")]
+        public List<RigidBodyComponent> TriggerHints;
 
-        [Tooltip("Disable responding to events for this script")]
-        [DefaultValue("trigger_disable")]
-        [DisplayName("-> Disable")]
-        public readonly string DisableEvent;
+        [Tooltip("Disable Collected\nDisable each objective object as they are collected."
+    + "\nOnly effective when the objective has a RequiredCount > 1 and Hide Collected if disabled."
+    + "\nCollected objects will become re-enabled if the objective is not completed and the user logs out, leaves the scene or changes outfits.")]
+        [DefaultValue(false)]
+        [DisplayName("Disable Collected")]
+        public bool DisableWhenCollected;
 
-        [Tooltip(@"If StartEnabled is true then the script will respond when the scene is loaded
-If StartEnabled is false then the script will not respond until an (-> Enable) event is received.")]
-        [DefaultValue(true)]
-        [DisplayName("Start Enabled")]
-        public readonly bool StartEnabled = true;
+        [Tooltip("Reset After\nSetting this above 0 will re-enable the objective that many seconds after it is collected."
+    + "\nOnly effective when the objective has a RequiredCount > 1 and Disable Collected is enabled."
+    + "\nCollected objects will also become re-enabled if the objective is not completed and the user logs out, leaves the scene or changes outfits.")]
+        [DefaultValue(0)]
+        [Range(0,600)]
+        [DisplayName("Reset After")]
+        public int ResetDelay;
+
+        [Tooltip("Globally Collect\nIf enabled then collected objectives will enable/disable for everyone, otherwise it will only enable/disable for the user who collected it."
+    + "\nOnly effective when the objective has a RequiredCount > 1."
+    + "\nIf disabled then collected objects will become re-enabled if the objective is not completed and the user logs out, leaves the scene or changes outfits.")]
+        [DefaultValue(false)]
+        [DisplayName("Globally Collect")]
+        public bool GloballyCollect;
         #endregion
 
-        private RigidBodyComponent triggerVolume;
-        bool enabled;
+        bool ScriptEnabled = true;
+
+        enum CollectionState
+        {
+            None,
+            Collecting,
+            Active
+        }
+        Dictionary<ComponentId, Dictionary<SessionId, CollectionState>> Collectors = new Dictionary<ComponentId, Dictionary<SessionId,CollectionState>>();
+
+        CollectionState GetState(int index, SessionId sessionId)
+        {
+            if (Collectors[TriggerObjectives[index].ComponentId].TryGetValue(sessionId, out CollectionState state)) return state;
+            return CollectionState.None;
+        }
 
         protected override void SimpleInit()
         {
-            if (!ObjectPrivate.TryGetFirstComponent<RigidBodyComponent>(out triggerVolume) || !triggerVolume.IsTriggerVolume())
+            RigidBodyComponent triggerVolume;
+            if (ObjectPrivate.TryGetFirstComponent<RigidBodyComponent>(out triggerVolume) && triggerVolume.IsTriggerVolume())
             {
-                Log.Write(LogLevel.Error, "QuestObjectTriggerVolume", "Must be attached to a trigger volume.");
-                return;
+                if (!TriggerObjectives.Contains(triggerVolume)) TriggerObjectives.Insert(0,triggerVolume);
             }
 
             base.SimpleInit();
+            if (BaseErrored) return;
 
-            triggerVolume.Subscribe(CollisionEventType.Trigger, OnCollide);
+            TriggerObjectives = TriggerObjectives.Distinct().ToList();
+            TriggerHints = TriggerHints.Distinct().ToList();
+            int rbs = 0;
+            for(int i=0; i< TriggerObjectives.Count; ++i)
+            {
+                var trigger = TriggerObjectives[i];
+                RigidBodyComponent hint = null;
+                int index = i;
+                if (trigger != null && trigger.IsValid && trigger.IsTriggerVolume())
+                {
+                    ++rbs;
+                    trigger.Subscribe(CollisionEventType.Trigger, (data) => OnCollide(data, index));
 
-            SubscribeToAll(EnableEvent, (ScriptEventData) => { enabled = true; });
-            SubscribeToAll(DisableEvent, (ScriptEventData) => { enabled = false; });
-            enabled = StartEnabled;
+                    if (TriggerHints.Count > i) hint = TriggerHints[i];
+                    else if (TriggerHints.Count > 0) hint = TriggerHints[0];
+
+                    if (hint != null && hint.IsValid && hint.IsTriggerVolume())
+                    {
+                        hint.Subscribe(CollisionEventType.Trigger, (data) => HintCollide(data, index));
+                    }
+
+                    Collectors[trigger.ComponentId] = new Dictionary<SessionId, CollectionState>();
+                }
+            }
+
+            if (rbs == 0)
+            {
+                Log.Write(LogLevel.Error, "Quest Objective Trigger", "Must be attached to a trigger volume or have Trigger Volumes set in Extra Objectives.");
+                return;
+            }
+
+            SubscribeToAll(EnableEvent, (ScriptEventData) => { ScriptEnabled = true; });
+            SubscribeToAll(DisableEvent, (ScriptEventData) => { ScriptEnabled = false; });
+            ScriptEnabled = StartEnabled;
+
+            Timer.Create(3, 73, Cleanup);
         }
 
-        void OnCollide(CollisionData collisionData)
+        // Try and clean up stale values. 
+        void Cleanup()
         {
-            if (enabled && collisionData.Phase == CollisionEventPhase.TriggerEnter)
+            foreach(var objective in Collectors)
             {
-                AgentPrivate agent = ScenePrivate.FindAgent(collisionData.HitObject.ObjectId);
-                if (agent != null && agent.IsValid)
+                List<SessionId> ToRemove = new List<SessionId>();
+                foreach(var collector in objective.Value)
                 {
-                    SessionId sessionId;
-                    try { sessionId = agent.AgentInfo.SessionId; }
-                    catch { Log.Write("Agent left scene"); return; }
-
-                    var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, sessionId) as ObjectiveDefinition.GetObjectiveData;
-                    if (objectiveData.Success && objectiveData.Objective.GetState() == ObjectiveState.Active)
+                    if (collector.Value == CollectionState.None
+                        || ScenePrivate.FindAgent(collector.Key) == null)
                     {
-                        objectiveData.Objective.SetState(ObjectiveState.Completed);
+                        ToRemove.Add(collector.Key);
                     }
+                }
+
+                foreach(var collector in ToRemove)
+                {
+                    objective.Value.Remove(collector);
                 }
             }
         }
 
-        protected override void OnObjectiveActive(AgentInfo agentInfo, Objective objective)
+        void HintCollide(CollisionData collisionData, int index)
+        {
+            AgentPrivate agent = ScenePrivate.FindAgent(collisionData.HitComponentId.ObjectId);
+            if (agent == null) return;
+
+            // If leaving the volume or the objective is disabled try and clear the hint regardless
+            if (collisionData.Phase == CollisionEventPhase.TriggerExit
+                || !ScriptEnabled)
+            {
+                try
+                {
+                    if (agent.Client.UI.HintText == HintText)
+                    {
+                        agent.Client.UI.HintText = "";
+                    }
+                }
+                catch (Exception) { }
+                return;
+            }
+            
+            try
+            {
+                if (collisionData.Phase == CollisionEventPhase.TriggerEnter)
+                {
+                    SessionId sessionId = GloballyCollect ? SessionId.Invalid : agent.AgentInfo.SessionId;
+                    var state = GetState(index, sessionId);
+                    if (state == CollectionState.Active)
+                    {
+                        agent.Client.UI.HintText = HintText;
+                    }
+                }
+            }
+            catch (Exception) { }
+        }
+
+        void OnCollide(CollisionData collisionData, int index)
+        {
+            if (ScriptEnabled)
+            {
+                try
+                {
+                    AgentPrivate agent = ScenePrivate.FindAgent(collisionData.HitComponentId.ObjectId);
+                    if (agent == null) return;
+
+                    SessionId sessionId = GloballyCollect ? SessionId.Invalid : agent.AgentInfo.SessionId;
+
+                    var state = GetState(index, sessionId);
+                    if (collisionData.Phase == CollisionEventPhase.TriggerEnter)
+                    {
+                        if (state == CollectionState.Active)
+                        {
+                            // agentInfo and agentInfo.SessionId are both cached and do not need try/catch if agent isn't null.
+                            CollectObjective(agent.AgentInfo.SessionId, index);
+                        }
+                    }
+                    else if (collisionData.Phase == CollisionEventPhase.TriggerExit)
+                    {
+                        if (state == CollectionState.Collecting)
+                        {
+                            CancelCollection(agent, index);
+                        }
+                    }
+                }
+                catch (Exception) { }
+            }
+        }
+
+        protected override void OnObjectiveCollectCompleted(AgentInfo agentInfo, Objective objective, int newCount, int index = -1)
+        {
+            if (DisableWhenCollected)
+            {
+                Collectors[TriggerObjectives[index].ComponentId].Remove(agentInfo.SessionId);
+                if (ResetDelay > 0)
+                {
+                    Timer.Create(ResetDelay, () =>
+                    {
+                        try
+                        {
+                            if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
+                            {
+                                Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Active;
+                            }
+                        }
+                        catch(Exception) { }
+                    });
+                }
+            }
+        }
+
+        protected override void OnObjectiveCollectCanceled(AgentInfo agentInfo, Objective objective, int index = -1)
+        {
+            try
+            {
+                if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
+                {
+                    Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Active;
+                }
+            }
+            catch (Exception) { }
+        }
+
+        protected override void OnObjectiveCollectStarted(AgentInfo agentInfo, Objective objective, int index = -1)
+        {
+            Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Collecting;
+
+            if (HintText != "")
+            {
+                try
+                {
+                    AgentPrivate agent = ScenePrivate.FindAgent(agentInfo.SessionId);
+                    if (agent.Client.UI.HintText == HintText)
+                    {
+                        agent.Client.UI.HintText = "";
+                    }
+                }
+                catch (Exception) { }
+            }
+        }
+
+        void ResetSession(SessionId session, bool enabled)
+        {
+            foreach (var objectiveCollectors in Collectors)
+            {
+                if (enabled)
+                {
+                    objectiveCollectors.Value[session] = CollectionState.Active;
+                }
+                else
+                {
+                    objectiveCollectors.Value.Remove(session);
+                }
+            }
+        }
+
+        protected override void OnObjectiveActive(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
             base.OnObjectiveActive(agentInfo, objective);
-            SendToAll(ActivatedEvent, GetEventData(agentInfo));
+            ResetSession(agentInfo.SessionId, true);
         }
 
-        protected override void OnObjectiveCompleted(AgentInfo agentInfo, Objective objective)
+        protected override void OnObjectiveCompleted(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
             base.OnObjectiveCompleted(agentInfo, objective);
-            SendToAll(CompletedEvent, GetEventData(agentInfo));
+            ResetSession(agentInfo.SessionId, false);
         }
 
-        protected override void OnObjectiveLocked(AgentInfo agentInfo, Objective objective)
+        protected override void OnObjectiveLocked(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
             base.OnObjectiveLocked(agentInfo, objective);
-            SendToAll(LockedEvent, GetEventData(agentInfo));
+            ResetSession(agentInfo.SessionId, false);
+        }
+
+        protected override void OnObjectiveReset(AgentInfo agentInfo, Objective objective)
+        {
+            base.OnObjectiveReset(agentInfo, objective);
+            try
+            {
+                ResetSession(agentInfo.SessionId, objective.GetState() == ObjectiveState.Active);
+            }
+            catch (Exception) { }
         }
     }
 }

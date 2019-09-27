@@ -192,8 +192,8 @@ namespace PewPewExample
                 if (IsAdmin(holdingAgent))
                 {
                     heldHand = data.HeldObjectInfo.ControlPoint;
-                    unsubscribe = holdingAgent.Client.SubscribeToCommand(BanCommand, OnBan, (d) => { }).Unsubscribe;
-                    unsubscribe += holdingAgent.Client.SubscribeToCommand(InfoCommand, OnInfo, (d) => { }).Unsubscribe;
+                    unsubscribe = holdingAgent.Client.SubscribeToCommand(BanCommand, OnBan, null).Unsubscribe;
+                    unsubscribe += holdingAgent.Client.SubscribeToCommand(InfoCommand, OnInfo, null).Unsubscribe;
                 }
                 else
                 {

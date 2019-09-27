@@ -97,7 +97,7 @@ If StartEnabled is false then the script will not respond to events until an (->
         protected override void SimpleInit()
         {
             UseAvatarRotation = DestinationForward.LengthSquared() < 0.01f;
-            NormalizedForward = (DestinationForward.LengthSquared() > 0.0f ? DestinationForward.Normalized() : Vector.Forward);
+            NormalizedForward = (DestinationForward.LengthSquared() > 0.0f ? DestinationForward.Normalized() : Vector.ObjectForward);
 
             if (StartEnabled) Subscribe(null);
 
