@@ -145,8 +145,8 @@ namespace ScriptLibrary
                 shotsFired = 0;
                 shotsHit = 0;
                 score = 0;
-                unsubscribe += agent.Client.SubscribeToCommand(ShootCommand, OnTrigger, (d) => { }).Unsubscribe;
-                unsubscribe += agent.Client.SubscribeToCommand(ReloadCommand, Reload, (d) => { }).Unsubscribe;
+                unsubscribe += agent.Client.SubscribeToCommand(ShootCommand, OnTrigger, null).Unsubscribe;
+                unsubscribe += agent.Client.SubscribeToCommand(ReloadCommand, Reload, null).Unsubscribe;
             }
             catch (System.Exception)
             {

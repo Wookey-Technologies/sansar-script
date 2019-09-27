@@ -66,11 +66,14 @@ namespace ScriptLibrary
         protected override void OnAgentJoinExperience(AgentInfo agentInfo, Quest quest)
         {
             base.OnAgentJoinExperience(agentInfo, quest);
-            if (quest.GetState() == QuestState.Offered || quest.GetState() == QuestState.None)
+            try
             {
-                Interaction.SetEnabled(agentInfo.SessionId, true);
-            }
-        }
+                if (quest.GetState() == QuestState.Offered || quest.GetState() == QuestState.None)
+                {
+                    Interaction.SetEnabled(agentInfo.SessionId, true);
+                }
+            } catch (Exception) { }
+}
 
         protected override void OnAgentResetQuest(AgentInfo agentInfo, Quest quest)
         {
@@ -92,19 +95,23 @@ namespace ScriptLibrary
 
             if (ActivateFirstObjective || ActivateAllObjectives)
             {
-                var objectives = quest.Objectives;
-                if (objectives.Length == 0)
+                try
                 {
-                    return;
-                }
-                int count = ActivateAllObjectives ? objectives.Length : 1;
-                for (int i=0; i<count; i++)
-                {
-                    if (objectives[i].GetState() == ObjectiveState.Locked)
+                    var objectives = quest.Objectives;
+                    if (objectives.Length == 0)
                     {
-                        objectives[i].SetState(ObjectiveState.Active);
+                        return;
+                    }
+                    int count = ActivateAllObjectives ? objectives.Length : 1;
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (objectives[i].GetState() == ObjectiveState.Locked)
+                        {
+                            objectives[i].SetState(ObjectiveState.Active);
+                        }
                     }
                 }
+                catch (Exception) { }
             }
 
             SendToAll(StartedEvent, GetEventData(agentInfo));

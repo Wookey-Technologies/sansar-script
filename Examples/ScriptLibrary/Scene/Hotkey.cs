@@ -69,6 +69,13 @@ A comma separated list of commands can be used to designate a key combo: all key
         [DisplayName("On Command 3 Release ->")]
         public readonly string Command3ReleaseEvent;
 
+        [Tooltip("Advanced Use: Add up to 20 hotkey subscriptions.\nEach entry describes one subscription like this: '+Trigger:event1,event2'"
+            + "\nThe first character can be + for key press only, - for release only or neither for both."
+            + "\nNext must be the command names followed by a colon. This can be several commands separated by commas for key combos."
+            + "\nThe rest of the entry should be the events to send.")]
+        [DisplayName("** Extra Commands")]
+        public readonly List<string> AdvancedCommands;
+
         [Tooltip("If Owner Restricted is set to true, then the commands in this script only respond to key-presses by the scene owner.")]
         [DefaultValue(false)]
         [DisplayName("Owner Restricted")]
@@ -152,32 +159,71 @@ If StartEnabled is false then the script will not respond to commands until an (
             Setup(Command1, Command1Event, Command1ReleaseEvent);
             Setup(Command2, Command2Event, Command2ReleaseEvent);
             Setup(Command3, Command3Event, Command3ReleaseEvent);
+            AdvancedSetup();
 
             Enabled = StartEnabled;
 
             SubscribeToAll(EnableEvent, (data) => { Enabled = true; });
             SubscribeToAll(DisableEvent, (data) => { Enabled = false; });
 
-            ScenePrivate.User.Subscribe("AddUser", (UserData data) =>
+            Action<SessionId> addUserAction = (SessionId userId) =>
             {
                 if (OwnerOnly)
                 {
-                    var ap = ScenePrivate.FindAgent(data.User);
+                    var ap = ScenePrivate.FindAgent(userId);
                     if (ap == null || ap.AgentInfo.AvatarUuid != ScenePrivate.SceneInfo.AvatarUuid)
                     {
                         return; // early exit because they aren't the owner.
                     }
                 }
 
-                if (!HeldKeys.ContainsKey(data.User))
+                if (!HeldKeys.ContainsKey(userId))
                 {
-                    HeldKeys.Add(data.User, 0);
+                    HeldKeys.Add(userId, 0);
                 }
-                Client client = ScenePrivate.FindAgent(data.User)?.Client;
+                Client client = ScenePrivate.FindAgent(userId)?.Client;
                 if (client != null) Subscribe(client);
-            });
+            };
+
+            ScenePrivate.User.Subscribe("AddUser", (UserData data) => addUserAction(data.User));
+
+            // Catch any users already in the scene.
+            foreach(AgentPrivate agent in ScenePrivate.GetAgents())
+            {
+                try
+                {
+                    addUserAction(agent.AgentInfo.SessionId);
+                } catch { };
+            }
 
             ScenePrivate.User.Subscribe("RemoveUser", Unsubscribe);
+        }
+
+        void AdvancedSetup()
+        {
+            foreach(string advCmd in AdvancedCommands)
+            {
+                string[] cmdsplit = advCmd.Trim().Split(':');
+                if (cmdsplit.Length != 2
+                    || string.IsNullOrWhiteSpace(cmdsplit[0])
+                    || string.IsNullOrWhiteSpace(cmdsplit[1]))
+                {
+                    Log.Write(LogLevel.Warning, "Advanced command is improperly formatted, must contain a : to separate command from events.");
+                }
+
+                if (cmdsplit[0][0] == '+')
+                {
+                    Setup(cmdsplit[0].Remove(0, 1).Trim(), cmdsplit[1], null);
+                }
+                else if (cmdsplit[0][0] == '-')
+                {
+                    Setup(cmdsplit[0].Remove(0, 1).Trim(), null, cmdsplit[1]);
+                }
+                else
+                {
+                    Setup(cmdsplit[0].Trim(), cmdsplit[1], cmdsplit[1]);
+                }
+            }
         }
 
         void Setup(string commandParam, string commandEventParam, string commandReleaseEventParam)
@@ -208,11 +254,7 @@ If StartEnabled is false then the script will not respond to commands until an (
 
                 Subscribe += (Client client) =>
                 {
-                    client.SubscribeToCommand(command, CommandAction.All, (CommandData data) =>
-                    {
-                        OnCommand(data);
-                    },
-                    (canceledData) => { });
+                    client.SubscribeToCommand(command, CommandAction.All, OnCommand, null);
                 };
             }
             if (combo == 0)
@@ -259,6 +301,17 @@ If StartEnabled is false then the script will not respond to commands until an (
                     }
 
                     HeldKeys[data.SessionId] |= currentHotkey;
+
+                    // If holding more keys, look for the key combo
+                    if (HeldKeys[data.SessionId] != currentHotkey
+                        && CommandEvents.TryGetValue(HeldKeys[data.SessionId], out sendEvents))
+                    {
+                        SimpleData sd = new SimpleData(this);
+                        sd.SourceObjectId = ObjectPrivate.ObjectId;
+                        sd.AgentInfo = ScenePrivate.FindAgent(data.SessionId)?.AgentInfo;
+                        sd.ObjectId = (sd.AgentInfo != null) ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
+                        SendToAll(sendEvents, sd);
+                    }
                 }
             }
             else if (data.Action == CommandAction.Released)
@@ -266,7 +319,10 @@ If StartEnabled is false then the script will not respond to commands until an (
                 if ((currentHotkey & HeldKeys[data.SessionId]) != 0x0)
                 {
                     string sendEvents;
-                    if (CommandReleaseEvents.TryGetValue(currentHotkey, out sendEvents))
+
+                    // Check for key combo release
+                    if (currentHotkey != HeldKeys[data.SessionId]
+                        && CommandReleaseEvents.TryGetValue(HeldKeys[data.SessionId], out sendEvents))
                     {
                         SimpleData sd = new SimpleData(this);
                         sd.SourceObjectId = ObjectPrivate.ObjectId;
@@ -276,6 +332,15 @@ If StartEnabled is false then the script will not respond to commands until an (
                     }
 
                     HeldKeys[data.SessionId] &= ~currentHotkey;
+
+                    if (CommandReleaseEvents.TryGetValue(currentHotkey, out sendEvents))
+                    {
+                        SimpleData sd = new SimpleData(this);
+                        sd.SourceObjectId = ObjectPrivate.ObjectId;
+                        sd.AgentInfo = ScenePrivate.FindAgent(data.SessionId)?.AgentInfo;
+                        sd.ObjectId = (sd.AgentInfo != null) ? sd.AgentInfo.ObjectId : ObjectId.Invalid;
+                        SendToAll(sendEvents, sd);
+                    }
                 }
             }
         }

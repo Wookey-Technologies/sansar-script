@@ -22,6 +22,10 @@ namespace ScriptLibrary
     public class LightOnOff : LibraryBase
     {
         #region EditorProperties
+        [Tooltip("Set the lights this script will change.\nThe first scriptable light on this object will be used if no lights are set here.\nTo set a light, select the light from the object panel and copy it (ctrl-c) then add a new entry to this list, select it and paste (ctrl-v).")]
+        [DisplayName("Lights")]
+        public readonly List<LightComponent> LightComponents;
+
         [Tooltip("Event name to turn on the light. Can be a comma separated list of event names.")]
         [DefaultValue("on")]
         [DisplayName("-> Turn On")]
@@ -89,7 +93,6 @@ If StartEnabled is false then the script will not respond to events until an (->
         public readonly bool StartEnabled = true;
         #endregion
 
-        List<LightComponent> lights = null;
         Action subscriptions = null;
 
         Sansar.Color initialColor;
@@ -115,28 +118,46 @@ If StartEnabled is false then the script will not respond to events until an (->
         {
             rnd = new Random();
 
-            lights = new List<LightComponent>();
-
-            uint lightCount = ObjectPrivate.GetComponentCount(ComponentType.LightComponent);
-
-            for (uint i = 0; i < lightCount; i++)
+            if (LightComponents.Count > 0)
             {
-                LightComponent lc = (LightComponent)ObjectPrivate.GetComponent(ComponentType.LightComponent, i);
-                if (lc.IsScriptable)
+                int removed = LightComponents.RemoveAll(light => light == null || !light.IsScriptable);
+                if (removed > 0)
                 {
-                    lights.Add(lc);
-                    break;
+                    Log.Write(LogLevel.Error, "LightOnOff::Init", $"{removed} lights were not set scriptable and will not be controllable by this script.");
+                }
+                if (LightComponents.Count == 0)
+                {
+                    Log.Write(LogLevel.Error, "LightOnOff::Init", "None of the selected Lights were scriptable.");
+                    return;
+                }
+            }
+            else
+            {
+                uint lightCount = ObjectPrivate.GetComponentCount(ComponentType.LightComponent);
+                bool foundUnscriptable = false;
+                for (uint i = 0; i < lightCount; i++)
+                {
+                    LightComponent lc = (LightComponent)ObjectPrivate.GetComponent(ComponentType.LightComponent, i);
+                    if (lc.IsScriptable)
+                    {
+                        LightComponents.Add(lc);
+                    }
+                    else if (!foundUnscriptable)
+                    {
+                        Log.Write(LogLevel.Error, "LightOnOff::Init", "Some lights on this object are not scriptable (first found: " + lc.Name + ")");
+                        foundUnscriptable = true;
+                    }
+                }
+
+                if (LightComponents.Count == 0)
+                {
+                    Log.Write(LogLevel.Error, "LightOnOff::Init", "No scriptable lights found on this object: " + ObjectPrivate.Name);
+                    return;
                 }
             }
 
-            if (lights.Count == 0)
-            {
-                Log.Write(LogLevel.Error, "SimpleLightOnOff::Init", "Object must have at least one scriptable light added at edit time for SimpleLightOnOff script to work.");
-                return;
-            }
-
-            initialColor = lights[0].GetNormalizedColor();
-            initialIntensity = lights[0].GetRelativeIntensity();
+            initialColor = LightComponents[0].GetNormalizedColor();
+            initialIntensity = LightComponents[0].GetRelativeIntensity();
 
             randomMinIntensity = (MinRandomIntensity < MaxRandomIntensity ? MinRandomIntensity : MaxRandomIntensity);
             randomMaxIntensity = (MinRandomIntensity < MaxRandomIntensity ? MaxRandomIntensity : MinRandomIntensity);
@@ -152,7 +173,7 @@ If StartEnabled is false then the script will not respond to events until an (->
 
         private void SetColorAndIntensityOfAllLights(Sansar.Color c, float intensity)
         {
-            foreach (var light in lights)
+            foreach (var light in LightComponents)
             {
                 light.SetColorAndIntensity(c, intensity);
             }
@@ -160,7 +181,7 @@ If StartEnabled is false then the script will not respond to events until an (->
 
         private void SetRandomColorAndIntensityOfAllLights()
         {
-            foreach (var light in lights)
+            foreach (var light in LightComponents)
             {
                 // Pick a random color but don't let it be too dark or else the relative intensity doesn't work well
                 Sansar.Vector randomVector = new Sansar.Vector((float)rnd.NextDouble(), (float)rnd.NextDouble(), (float)rnd.NextDouble());
@@ -209,8 +230,8 @@ If StartEnabled is false then the script will not respond to events until an (->
         {
             if ((interpolationCoroutine == null) && HasFadeTime())
             {
-                targetColor = previousColor = lights[0].GetNormalizedColor();
-                targetIntensity = previousIntensity = lights[0].GetRelativeIntensity();
+                targetColor = previousColor = LightComponents[0].GetNormalizedColor();
+                targetIntensity = previousIntensity = LightComponents[0].GetRelativeIntensity();
 
                 interpolationDuration = 0.0f;
                 interpolationTime = 0.0f;
@@ -237,8 +258,8 @@ If StartEnabled is false then the script will not respond to events until an (->
                 {
                     if (TurnOnFadeTime > 0.0f)
                     {
-                        previousColor = lights[0].GetNormalizedColor();
-                        previousIntensity = lights[0].GetRelativeIntensity();
+                        previousColor = LightComponents[0].GetNormalizedColor();
+                        previousIntensity = LightComponents[0].GetRelativeIntensity();
                         targetColor = initialColor;
                         targetIntensity = initialIntensity;
                         interpolationDuration = TurnOnFadeTime;
@@ -256,8 +277,8 @@ If StartEnabled is false then the script will not respond to events until an (->
                 {
                     if (TurnOffFadeTime > 0.0f)
                     {
-                        previousColor = lights[0].GetNormalizedColor();
-                        previousIntensity = lights[0].GetRelativeIntensity();
+                        previousColor = LightComponents[0].GetNormalizedColor();
+                        previousIntensity = LightComponents[0].GetRelativeIntensity();
                         targetColor = Sansar.Color.Black;
                         targetIntensity = 0.0f;
                         interpolationDuration = TurnOffFadeTime;
@@ -286,8 +307,8 @@ If StartEnabled is false then the script will not respond to events until an (->
                         // Pick a random intensity from min to max
                         float randomIntensity = randomMinIntensity + (randomMaxIntensity - randomMinIntensity) * (float)rnd.NextDouble();
 
-                        previousColor = lights[0].GetNormalizedColor();
-                        previousIntensity = lights[0].GetRelativeIntensity();
+                        previousColor = LightComponents[0].GetNormalizedColor();
+                        previousIntensity = LightComponents[0].GetRelativeIntensity();
                         targetColor = randomColor;
                         targetIntensity = randomIntensity;
                         interpolationDuration = TurnRandomFadeTime;

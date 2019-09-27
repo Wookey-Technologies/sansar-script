@@ -21,6 +21,7 @@
     "PositionReset.cs",
     "ProgressBar.cs",
     "Prompt.cs",
+    "ScriptWatcher.cs",
     "Selector.cs",
     "SitStand.cs",
     "Sound.cs",

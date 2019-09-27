@@ -106,7 +106,7 @@ public class MoverExample3 : SceneObjectScript
 
             // Calculate random rotation up to one half turn from the current orientation around the up axis
             float rotationAngle = (float) (Mathf.PiOverTwo + rng.NextDouble() * Mathf.PiOverTwo);
-            var randomRotation = Quaternion.FromAngleAxis(spinSign * rotationAngle, Vector.Up) * ObjectPrivate.Rotation;
+            var randomRotation = Quaternion.FromAngleAxis(spinSign * rotationAngle, Vector.ObjectUp) * ObjectPrivate.Rotation;
 
             // Calculate the time for this rotation based on the specified spin speed
             double timeForRotation = (rotationAngle / Mathf.TwoPi) / SpinSpeed;

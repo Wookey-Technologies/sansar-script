@@ -77,10 +77,14 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
                     catch { Log.Write("Agent left scene"); return; }
 
                     var questData = WaitFor(QuestDefinition.GetQuest, sessionId) as QuestDefinition.GetQuestData;
-                    if (questData.Success && (questData.Quest.GetState() == QuestState.None || questData.Quest.GetState() == QuestState.None))
+                    try
                     {
-                        questData.Quest.Offer();
+                        if (questData.Success && (questData.Quest.GetState() == QuestState.None || questData.Quest.GetState() == QuestState.None))
+                        {
+                            questData.Quest.Offer();
+                        }
                     }
+                    catch (Exception) { }
                 }
             }
         }
@@ -89,20 +93,24 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
         {
             if (ActivateFirstObjective || ActivateAllObjectives)
             {
-                var objectives = quest.Objectives;
-                if (objectives.Length == 0)
+                try
                 {
-                    return;
-                }
-                int count = ActivateAllObjectives ? objectives.Length : 1;
-                for (int i=0; i<count; i++)
-                {
-                    if (objectives[i].GetState() == ObjectiveState.Locked)
+                    var objectives = quest.Objectives;
+                    if (objectives.Length == 0)
                     {
-                        objectives[i].SetState(ObjectiveState.Active);
+                        return;
+                    }
+                    int count = ActivateAllObjectives ? objectives.Length : 1;
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (objectives[i].GetState() == ObjectiveState.Locked)
+                        {
+                            objectives[i].SetState(ObjectiveState.Active);
+                        }
                     }
                 }
-            }
+                catch (Exception) { }
+        }
         }
     }
 }

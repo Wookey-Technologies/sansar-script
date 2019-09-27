@@ -48,18 +48,18 @@ namespace CastRayExample
             ControlPointType controlPoint = ControlPointType.GazeTarget;
             if (ap.GetControlPointEnabled(controlPoint))
             {
-                offset = Vector.Forward * distance;
+                offset = Vector.ObjectForward * distance;
                 start = ap.GetControlPointPosition(controlPoint);
                 orientation = ap.GetControlPointOrientation(controlPoint);
             }
             else
             {
-                offset = Vector.Left * distance;
-                start = op.Position + Vector.Up * 0.5f;
+                offset = Vector.ObjectLeft * distance;
+                start = op.Position + Vector.ObjectUp * 0.5f;
                 orientation = op.Rotation;
             }
 
-            offset = offset.Rotate(ref orientation);
+            offset = offset.Rotate(orientation);
             end = start + offset;
         }
 
