@@ -226,6 +226,8 @@ To send or receive events to/from a specific group from outside that group appen
 
         public sealed override void Init()
         {
+            PreSimpleInit();
+
             __SimpleTag = GetType().Name + " [S:" + Script.ID.ToString() + " O:" + ObjectPrivate.ObjectId.ToString() + "]";
             StartCoroutine(FindDebugger, 0.1);
             Yield();
@@ -235,6 +237,8 @@ To send or receive events to/from a specific group from outside that group appen
 
             SimpleInit();
         }
+
+        virtual protected void PreSimpleInit() {}
 
         private void FindDebugger(double rate)
         {
