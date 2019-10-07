@@ -54,7 +54,7 @@ namespace PewPewExample
 
         [DisplayName("Clip Size")]
         [Tooltip("Number of shots fired before a reload is required. Set to 0 for unlimited.")]
-        [DefaultValue(6)]
+        [DefaultValue(0)]
         [Range(0, 24)]
         public int ClipSize;
 
@@ -194,14 +194,31 @@ namespace PewPewExample
         {
             try
             {
+                switch(command.ControlPoint)
+                {
+                    case ControlPointType.DesktopGrab:
+                        if (!FreeClickEnabled && !command.MouseLookMode)
+                        {
+                            AgentPrivate user = ScenePrivate.FindAgent(holdingAgent.SessionId);
+                            user.SendChat("This device does not work in desktop Free Click Mode: press Escape to enter or exit Mouse Look.");
+                            return;
+                        }
+                        break;
+                    case ControlPointType.LeftTool:
+                    case ControlPointType.RightTool:
+                        // If they grabbed it in desktop let them use it from whichever hand now? I guess?
+                        if (heldHand != ControlPointType.DesktopGrab && command.ControlPoint != heldHand)
+                        {
+                            return;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+
                 if (DebugLogging) Log.Write("Is Mouse Look Mode ", command.MouseLookMode.ToString());
                 
-                if (!command.MouseLookMode && !FreeClickEnabled)
-                {
-                    AgentPrivate user = ScenePrivate.FindAgent(holdingAgent.SessionId);
-                    user.SendChat("This device does not work in desktop Mouse Look Mode: press Escape to enter or exit Mouse Look.");
-                    return;
-                }
 
                 if (CheckReload(command))
                 {
@@ -215,7 +232,7 @@ namespace PewPewExample
                     return;
                 }
 
-                if (ammo <= 0)
+                if (ClipSize > 0 && ammo <= 0)
                 {
                     // Play 'empty' sound
                     if (OutOfAmmoSound != null) ScenePrivate.PlaySoundAtPosition(OutOfAmmoSound, command.TargetingOrigin, ShotSettings);
