@@ -61,7 +61,7 @@ namespace EvoAv.Iterators {
 
     void Yield(T item)
     {
-      if (IsAlive) throw new Exception("Calling yield callback outside Iterator scope is not allowed.");
+      if (!IsAlive) throw new Exception("Calling yield callback outside Iterator scope is not allowed.");
       WaitQueue.Dequeue()(item, false);
       if (--signalCount == 0) {
         coroutine.ResetSignals();
