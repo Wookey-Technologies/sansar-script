@@ -8,9 +8,9 @@ namespace EvoAv.Iterators {
   public class Iterator<T> : IEnumerable<T> {
     
     Action<Action<T>> collector;
-    public static Func<Action, Action<OperationCompleteEvent>, ICoroutine> StartCoroutine;
-    public static Func<int> WaitForSignal;
-    public static Action<ICoroutine> WaitFor;
+    Func<Action, Action<OperationCompleteEvent>, ICoroutine> StartCoroutine;
+    Func<int> WaitForSignal;
+    Action<ICoroutine> WaitFor;
     
     public Iterator(Func<Action, Action<OperationCompleteEvent>, ICoroutine> sc, Func<int> wfs, Action<ICoroutine> wf, Action<Action<T>> col)
     {
