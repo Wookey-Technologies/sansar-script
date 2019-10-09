@@ -1,6 +1,6 @@
 # Iterators in Sansar
 
-Writing your own iterators allows you iterate through data/objects in a way that is memory efficient. It is essentially a function that keeps state about number of times it was called, does not need to store the entire list of data, and allows it to be used in in interative operations, such as `foreach`. Iterators allow to potentially iterate through an infinite (or indefinite) number of items.
+Writing your own iterators allows you to iterate through data/objects in a way that is memory efficient. It is essentially a function that keeps the state about the number of times it was called, does not need to store the entire list of data, and allows it to be used in interative operations, such as `foreach`. Iterators allow to potentially iterate through an infinite (or indefinite) number of items.
 
 Iterators use `yield` to hand over the next value in the interation, which pauses the code until the next item is asked for. Because Sansar uses a subset of C# that prohibits the use of `yield` there is no way to create your own iterators. Or is there? 😉
 
@@ -8,7 +8,7 @@ Using `StartCoroutine`, `WaitForSignal`, and `WaitFor`, I have managed to create
 
 ## Usage
 
-Include the interator classes in your project and upload your script with that file. To do that you upload your script as a `JSON`, such as this:
+Include the interator classes in your project and upload your script with that file. To do that, you upload your script as a `JSON`, such as this:
 
 **IteratorExample.json**
 ```JSON
@@ -20,8 +20,9 @@ Include the interator classes in your project and upload your script with that f
 }
 ```
 
-Create your Sansar script with a single helper function to create the the iterator:
+Create your Sansar script with a single helper function to create the iterator:
 
+**Iterator.cs**
 ```csharp
 using Sansar.Simulation;
 using Sansar.Script;
@@ -42,7 +43,7 @@ public class IteratorExample : SceneObjectScript {
 }
 ```
 
-Now you can create your own interator. The following example iterates through the interator indinitely. Don't worry about the `while(true)` in there, `yield()` pauses the code each time, and the loop ends when you destroy the interator.
+Now you can create your own interator. The following example iterates through a counter indefinitely. Don't worry about the `while(true)` in there, `yield()` pauses the code each time, and the loop ends when you destroy the interator.
 
 ```csharp
     IEnumerable<int> counter = CreateIterator((Action<int> yield) => {
@@ -66,4 +67,4 @@ And then you can use the `counter` like any `IEnumerable` iterator. The followin
     }
 ```
 
-In my tests i was able to iterate about 4000 iterations a second, which makes its performance footprint equivalent to a raycast.
+In my tests I was able to make about 4000 iterations a second, which makes its performance footprint equivalent to a raycast.
