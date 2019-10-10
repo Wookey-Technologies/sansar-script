@@ -69,6 +69,11 @@ namespace PewPewExample
         [DisplayName("Target Self To Reload")]
         public bool TargetSelfReload;
 
+        [DisplayName("Free Click Enabled")]
+        [Tooltip("If true the gun will work with normal mouse clicks, outside of mouse look mode.\nNote that this mode can make aiming games trivial.")]
+        [DefaultValue(false)]
+        public bool FreeClickEnabled;
+
         private int ammo;
         private int shotsFired;
         private int shotsHit;
@@ -180,6 +185,16 @@ namespace PewPewExample
 
         void OnTrigger(CommandData command)
         {
+            if(command.ControlPoint == ControlPointType.DesktopGrab)
+            {
+                if (!FreeClickEnabled && !command.MouseLookMode)
+                {
+                    AgentPrivate user = ScenePrivate.FindAgent(holdingAgent.SessionId);
+                    user.SendChat("This device does not work in desktop Free Click Mode: press Escape to enter or exit Mouse Look.");
+                    return;
+                }
+            }
+            
             try
             {
                 if (CheckReload(command))
