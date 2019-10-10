@@ -19,8 +19,8 @@ namespace PewPewExample
         [Tooltip("Played at the location they were hit.")]
         public SoundResource PlayerHitSound;
 
-        [Tooltip("Played at the location the shot originated from when a player or target is hit.")]
-        public SoundResource ShotHitSound;
+        [Tooltip("Played at the location the shot originated from when fired.")]
+        public SoundResource ShotSound;
 
         [Tooltip("Played at the location the shot originated from when no player or target is hit.")]
         public SoundResource ShotMissSound;
@@ -201,6 +201,8 @@ namespace PewPewExample
                 
                 shotsFired++;
                 ammo--;
+                if (ShotSound != null) ScenePrivate.PlaySoundAtPosition(ShotSound, command.TargetingOrigin, ShotSettings);
+
 
                 var targetAgent = ScenePrivate.FindAgent(command.TargetingComponent.ObjectId);
                 if (targetAgent != null)
@@ -209,7 +211,6 @@ namespace PewPewExample
                     shotsHit++;
                     score += PointsPerPlayer;
                     if (PlayerHitSound != null) ScenePrivate.PlaySoundAtPosition(PlayerHitSound, command.TargetingPosition, TargetSettings);
-                    if (ShotHitSound != null) ScenePrivate.PlaySoundAtPosition(ShotHitSound, command.TargetingOrigin, ShotSettings);
                     if (DebugLogging) Log.Write(GetType().Name, "Player Hit");
                 }
                 else
@@ -220,7 +221,6 @@ namespace PewPewExample
                         Target target = targetObject.FindScripts<Target>("PewPewExample.Target").FirstOrDefault();
                         if (target != null)
                         {
-                            if (ShotHitSound != null) ScenePrivate.PlaySoundAtPosition(ShotHitSound, command.TargetingOrigin, ShotSettings);
                             if (DebugLogging) Log.Write(GetType().Name, "Target hit");
                             score += target.Hit(holdingAgent, ScenePrivate);
                             shotsHit++;
