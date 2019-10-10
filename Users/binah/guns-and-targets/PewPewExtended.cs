@@ -48,7 +48,9 @@ namespace PewPewExample
         [Tooltip("Points earned any time a player is hit.")]
         public int PointsPerPlayer;
 
-        [DefaultValue(6)]
+        [DisplayName("Clip Size")]
+        [Tooltip("Number of shots fired before a reload is required. Set to 0 for unlimited.")]
+        [DefaultValue(0)]
         [Range(0, 24)]
         public int ClipSize;
 
@@ -146,6 +148,8 @@ namespace PewPewExample
 
         void Reload(CommandData command)
         {
+            if (ClipSize == 0) return; 
+
             try
             {
                 if (ReloadedSound != null) ScenePrivate.PlaySoundAtPosition(ReloadedSound, command.TargetingOrigin, ShotSettings);
@@ -190,7 +194,7 @@ namespace PewPewExample
                     return;
                 }
 
-                if (ammo <= 0)
+                if (ClipSize > 0 && ammo <= 0)  
                 {
                     // Play 'empty' sound
                     if (OutOfAmmoSound != null) ScenePrivate.PlaySoundAtPosition(OutOfAmmoSound, command.TargetingOrigin, ShotSettings);
