@@ -257,6 +257,10 @@ namespace PewPewExample
     [RegisterReflective]
     public class Target : ObjectScript
     {
+        [DisplayName("Target Hit ->")]
+        [Tooltip("This event will act as though the shooter did the action. For example, a Teleport script listening for this event would teleport the user that selected or shot this target.")]
+        public string ShotHitEvent;
+
         [Tooltip("Sound to play at this targets location when the target is hit.")]
         public SoundResource HitSound;
 
@@ -271,6 +275,29 @@ namespace PewPewExample
         [DisplayName("Point Value")]
         public int PointValue;
 
+        [DefaultValue(false)]
+        public bool DebugLogging;
+
+        public interface ISimpleData
+        {
+            AgentInfo AgentInfo { get; }
+            ObjectId ObjectId { get; }
+            ObjectId SourceObjectId { get; }
+
+            // Extra data
+            Reflective ExtraData { get; }
+        }
+
+        public class SimpleData : Reflective, ISimpleData
+        {
+            public SimpleData(ScriptBase script) { ExtraData = script; }
+            public AgentInfo AgentInfo { get; set; }
+            public ObjectId ObjectId { get; set; }
+            public ObjectId SourceObjectId { get; set; }
+
+            public Reflective ExtraData { get; }
+        }
+
         PlaySettings SoundSettings;
         public override void Init()
         {
@@ -283,6 +310,16 @@ namespace PewPewExample
             {
                 scene.PlaySoundAtPosition(HitSound, ObjectPrivate.Position, SoundSettings);
             }
+            try
+            {
+                SimpleData simpleData = new SimpleData(this);
+                simpleData.AgentInfo = agent;
+                simpleData.ObjectId = agent.ObjectId;
+                simpleData.SourceObjectId = ObjectPrivate.ObjectId;
+                PostScriptEvent(ShotHitEvent, simpleData);
+                if (DebugLogging) Log.Write("Event sent  ", ShotHitEvent);
+            }
+            catch (System.Exception) { }
             return PointValue;
         }
     }
