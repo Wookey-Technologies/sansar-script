@@ -42,11 +42,6 @@ namespace ScriptLibrary
         [DefaultValue("")]
         [DisplayName("-> Subscription Report")]
         public readonly string SubscriptionReportEvent;
-
-        [DisplayName("Reset Scene")]
-        [Tooltip("Reset Scene\nReset the scene when memory limit reaches critical. This can prevent having a scene where no scripts are running. When the scene resets everyone will be kicked out and sent back to spawn points.")]
-        [DefaultValue(false)]
-        public bool ResetScene;
         #endregion
 
         public bool DebugSimple { get { return _DebugEvents; } }
@@ -60,21 +55,9 @@ namespace ScriptLibrary
             TrackSubscriptionsEnabled = !string.IsNullOrWhiteSpace(SubscriptionReportEvent);
 
             if (DebugMemoryEnabled) StartCoroutine(DebugMemory);
-            if (ResetScene) Memory.Subscribe(MemoryUpdate);
 
             SubscribeToAll(MemoryReportEvent, MemoryReport);
             SubscribeToAll(SubscriptionReportEvent, SubscribeReport);
-        }
-
-        void MemoryUpdate(MemoryData data)
-        {
-            if (data.UseLevel == MemoryUseLevel.Critical
-                || data.UseLevel == MemoryUseLevel.Limit
-                || Memory.UsedBytes > Memory.PolicyCritical)
-            {
-                Log.Write(LogLevel.Error, "RESET", "SCRIPT MEMORY HAS PASSED CRITICAL LEVEL, RESETTING WORLD. " + Memory.UsedBytes + "/" + Memory.PolicyCritical);
-                ScenePrivate.ResetScene();
-            }
         }
 
         LogLevel GetLogLevel()

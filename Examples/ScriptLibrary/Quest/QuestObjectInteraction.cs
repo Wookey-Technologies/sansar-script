@@ -48,7 +48,7 @@ namespace ScriptLibrary
         [Tooltip("Hide Collected\nHide the objective once it is collected."
             + "\nRequires the objective meshes have Is Scriptable set.")]
         [DisplayName("Hide Collected")]
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         public bool HideCollected;
 
         [Tooltip("Hide Inactive\nOnly show these objectives while active."
@@ -84,20 +84,26 @@ namespace ScriptLibrary
         private List<Interaction> Interactions = new List<Interaction>();
         CollectionState GetState(int index, SessionId sessionId)
         {
-            if (Collectors[InteractionObjectives[index].ComponentId].TryGetValue(sessionId, out CollectionState state)) return state;
+            if (GloballyCollect)
+            {
+                sessionId = SessionId.Invalid;
+            }
+
+            if (Collectors[InteractionObjectives[index].ComponentId].TryGetValue(sessionId, out CollectionState state))
+            {
+                return state;
+            }
+
             return CollectionState.None;
         }
 
-        protected override void SimpleInit()
+        protected override void InitObjective()
         {
             MeshComponent localMesh;
             if (ObjectPrivate.TryGetFirstComponent<MeshComponent>(out localMesh))
             {
                 if (!InteractionObjectives.Contains(localMesh)) InteractionObjectives.Insert(0, localMesh);
             }
-
-            base.SimpleInit();
-            if (BaseErrored) return;
 
             InteractionObjectives = InteractionObjectives.Distinct().ToList();
             InteractionHints = InteractionHints.Distinct().ToList();
@@ -133,7 +139,7 @@ namespace ScriptLibrary
 
             if (meshCount == 0)
             {
-                Log.Write(LogLevel.Error, "Quest Objective Interaction", "Must be attached to a mesh or have valid meshes set in Extra Objectives.");
+                QLog(LogLevel.Error, "Must be attached to a mesh or have valid meshes set in Extra Objectives.");
                 return;
             }
 
@@ -207,8 +213,7 @@ namespace ScriptLibrary
             {
                 if (collisionData.Phase == CollisionEventPhase.TriggerEnter)
                 {
-                    SessionId sessionId = GloballyCollect ? SessionId.Invalid : agent.AgentInfo.SessionId;
-                    var state = GetState(index, sessionId);
+                    var state = GetState(index, agent.AgentInfo.SessionId);
                     if (state == CollectionState.Active)
                     {
                         agent.Client.UI.HintText = HintText;
@@ -227,9 +232,7 @@ namespace ScriptLibrary
                     AgentPrivate agent = ScenePrivate.FindAgent(interactionData.AgentId);
                     if (agent == null) return;
 
-                    SessionId sessionId = GloballyCollect ? SessionId.Invalid : agent.AgentInfo.SessionId;
-
-                    var state = GetState(index, sessionId);
+                    var state = GetState(index, agent.AgentInfo.SessionId);
                     if (state == CollectionState.Active)
                     {
                         // agentInfo and agentInfo.SessionId are both cached and do not need try/catch if agent isn't null.
@@ -240,21 +243,52 @@ namespace ScriptLibrary
             }
         }
 
-        private void Set(SessionId session, int index, bool enabled)
+        private void Set(SessionId session, int index, CollectionState state)
         {
+            if (GloballyCollect)
+            {
+                session = SessionId.Invalid;
+            }
+            bool enabled = state != CollectionState.None;
+
             try
             {
-                Interactions[index].SetEnabled(session, enabled);
-                if (HideCollected && InteractionObjectives[index].IsScriptable) InteractionObjectives[index].SetIsVisible(session, enabled);
+                if (state != CollectionState.None)
+                {
+                    Collectors[InteractionObjectives[index].ComponentId][session] = state;
+                }
+                else
+                {
+                    Collectors[InteractionObjectives[index].ComponentId].Remove(session);
+                }
+
+                if (GloballyCollect)
+                {
+                    Interactions[index].SetEnabled(enabled);
+                }
+                else
+                {
+                    Interactions[index].SetEnabled(session, enabled);
+                }
+
+                if (HideCollected && InteractionObjectives[index].IsScriptable)
+                {
+                    if (GloballyCollect)
+                    {
+                        InteractionObjectives[index].SetIsVisible(enabled);
+                    }
+                    else
+                    {
+                        InteractionObjectives[index].SetIsVisible(session, enabled);
+                    }
+                }
             }
-            catch (Exception) { }
+            catch { }
         }
 
         protected override void OnObjectiveCollectCompleted(AgentInfo agentInfo, Objective objective, int newCount, int index = -1)
         {
-            SessionId sessionId = GloballyCollect ? SessionId.Invalid : agentInfo.SessionId;
-            Collectors[InteractionObjectives[index].ComponentId].Remove(sessionId);
-            Set(agentInfo.SessionId, index, false);
+            Set(agentInfo.SessionId, index, CollectionState.None);
 
             try
             {
@@ -267,12 +301,11 @@ namespace ScriptLibrary
                             if (objective.IsValid && agentInfo.IsValid
                                 && objective.GetState() == ObjectiveState.Active)
                             {
-                                Collectors[InteractionObjectives[index].ComponentId][sessionId] = CollectionState.Active;
-                                Set(agentInfo.SessionId, index, true);
+                                Set(agentInfo.SessionId, index, CollectionState.Active);
                             }
                             else
                             {
-                                Collectors[InteractionObjectives[index].ComponentId].Remove(sessionId);
+                                Set(agentInfo.SessionId, index, CollectionState.None);
                             }
                         }
                         catch (Exception) { }
@@ -284,32 +317,28 @@ namespace ScriptLibrary
 
         protected override void OnObjectiveCollectCanceled(AgentInfo agentInfo, Objective objective, int index = -1)
         {
-            SessionId sessionId = GloballyCollect ? SessionId.Invalid : agentInfo.SessionId;
-
             try
             {
                 if (objective.IsValid && agentInfo.IsValid
                     && objective.GetState() == ObjectiveState.Active)
                 {
-                    Collectors[InteractionObjectives[index].ComponentId][sessionId] = CollectionState.Active;
-                    Set(agentInfo.SessionId, index, true);
+                    Set(agentInfo.SessionId, index, CollectionState.Active);
                 }
                 else
                 {
-                    Collectors[InteractionObjectives[index].ComponentId].Remove(sessionId);
+                    Set(agentInfo.SessionId, index, CollectionState.None);
                 }
             }
             catch (Exception)
             {
-                Collectors[InteractionObjectives[index].ComponentId].Remove(sessionId);
+                Set(agentInfo.SessionId, index, CollectionState.None);
             }
             
         }
 
         protected override void OnObjectiveCollectStarted(AgentInfo agentInfo, Objective objective, int index = -1)
         {
-            SessionId sessionId = GloballyCollect ? SessionId.Invalid : agentInfo.SessionId;
-            Collectors[InteractionObjectives[index].ComponentId][sessionId] = CollectionState.Collecting;
+            Set(agentInfo.SessionId, index, CollectionState.Collecting);
             
             if (HintText != "")
             {
@@ -327,21 +356,27 @@ namespace ScriptLibrary
 
         void ResetSession(SessionId session, bool enabled)
         {
-            foreach (var objectiveCollectors in Collectors)
+            if (!GloballyCollect)
             {
-                if (enabled)
+                foreach (var objectiveCollectors in Collectors)
                 {
-                    objectiveCollectors.Value[session] = CollectionState.Active;
+                    if (enabled)
+                    {
+                        objectiveCollectors.Value[session] = CollectionState.Active;
+                    }
+                    else
+                    {
+                        objectiveCollectors.Value.Remove(session);
+                    }
                 }
-                else
-                {
-                    objectiveCollectors.Value.Remove(session);
-                }
-            }
 
-            foreach (var interaction in Interactions)
-            {
-                if (interaction != null) interaction.SetEnabled(session, enabled);
+                foreach (var interaction in Interactions)
+                {
+                    if (interaction != null)
+                    {
+                        interaction.SetEnabled(session, enabled);
+                    }
+                }
             }
 
             if (HideInactive)
@@ -350,7 +385,15 @@ namespace ScriptLibrary
                 {
                     if (mesh.IsScriptable)
                     {
-                        mesh.SetIsVisible(enabled);
+                        if (GloballyCollect)
+                        {
+                            bool globallyEnabled = Collectors[mesh.ComponentId].ContainsKey(SessionId.Invalid);
+                            mesh.SetIsVisible(session, globallyEnabled);
+                        }
+                        else
+                        {
+                            mesh.SetIsVisible(session, enabled);
+                        }
                     }
                 }
             }
@@ -358,25 +401,35 @@ namespace ScriptLibrary
 
         protected override void OnObjectiveActive(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            base.OnObjectiveActive(agentInfo, objective);
+            base.OnObjectiveActive(agentInfo, objective, initialJoin);
             ResetSession(agentInfo.SessionId, true);
         }
 
         protected override void OnObjectiveCompleted(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            base.OnObjectiveCompleted(agentInfo, objective);
+            base.OnObjectiveCompleted(agentInfo, objective, initialJoin);
             ResetSession(agentInfo.SessionId, false);
         }
 
         protected override void OnObjectiveLocked(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            base.OnObjectiveLocked(agentInfo, objective);
+            base.OnObjectiveLocked(agentInfo, objective, initialJoin);
             ResetSession(agentInfo.SessionId, false);
         }
 
-        protected override void OnObjectiveReset(AgentInfo agentInfo, Objective objective)
+        protected override void OnObjectiveReset(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            base.OnObjectiveReset(agentInfo, objective);
+            base.OnObjectiveReset(agentInfo, objective, initialJoin);
+            try
+            {
+                ResetSession(agentInfo.SessionId, objective.GetState() == ObjectiveState.Active);
+            }
+            catch (Exception) { }
+        }
+
+        protected override void OnObjectiveJoinExperience(AgentInfo agentInfo, Objective objective)
+        {
+            base.OnObjectiveJoinExperience(agentInfo, objective);
             try
             {
                 ResetSession(agentInfo.SessionId, objective.GetState() == ObjectiveState.Active);

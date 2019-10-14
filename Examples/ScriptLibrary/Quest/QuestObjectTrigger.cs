@@ -72,24 +72,40 @@ namespace ScriptLibrary
             Collecting,
             Active
         }
-        Dictionary<ComponentId, Dictionary<SessionId, CollectionState>> Collectors = new Dictionary<ComponentId, Dictionary<SessionId,CollectionState>>();
+        Dictionary<int, Dictionary<SessionId, CollectionState>> Collectors = new Dictionary<int, Dictionary<SessionId,CollectionState>>();
 
         CollectionState GetState(int index, SessionId sessionId)
         {
-            if (Collectors[TriggerObjectives[index].ComponentId].TryGetValue(sessionId, out CollectionState state)) return state;
+            if (!ObjectiveDefinition.Ready)
+            {
+                QLog(LogLevel.Warning, "Definition not ready.");
+                return CollectionState.None;
+            }
+            else if (sessionId != SessionId.Invalid && !IsTracked(sessionId))
+            {
+                QLog(LogLevel.Warning, "Session not yet tracking.");
+                OnAddAgent(sessionId);
+                return CollectionState.None;
+            }
+
+            if (Collectors[index].TryGetValue(sessionId, out CollectionState state))
+            {
+                return state;
+            }
             return CollectionState.None;
         }
 
-        protected override void SimpleInit()
+        protected override void InitObjective()
         {
             RigidBodyComponent triggerVolume;
             if (ObjectPrivate.TryGetFirstComponent<RigidBodyComponent>(out triggerVolume) && triggerVolume.IsTriggerVolume())
             {
-                if (!TriggerObjectives.Contains(triggerVolume)) TriggerObjectives.Insert(0,triggerVolume);
+                if (!TriggerObjectives.Contains(triggerVolume))
+                {
+                    QLog(LogLevel.Info, "Adding scripted object as trigger volume.");
+                    TriggerObjectives.Insert(0, triggerVolume);
+                }
             }
-
-            base.SimpleInit();
-            if (BaseErrored) return;
 
             TriggerObjectives = TriggerObjectives.Distinct().ToList();
             TriggerHints = TriggerHints.Distinct().ToList();
@@ -97,11 +113,15 @@ namespace ScriptLibrary
             for(int i=0; i< TriggerObjectives.Count; ++i)
             {
                 var trigger = TriggerObjectives[i];
+                
                 RigidBodyComponent hint = null;
                 int index = i;
                 if (trigger != null && trigger.IsValid && trigger.IsTriggerVolume())
                 {
                     ++rbs;
+                    QLog(LogLevel.Info, "Subscribing to collision " + trigger.Name + ", index " + index);
+
+                    Collectors[i] = new Dictionary<SessionId, CollectionState>();
                     trigger.Subscribe(CollisionEventType.Trigger, (data) => OnCollide(data, index));
 
                     if (TriggerHints.Count > i) hint = TriggerHints[i];
@@ -109,16 +129,15 @@ namespace ScriptLibrary
 
                     if (hint != null && hint.IsValid && hint.IsTriggerVolume())
                     {
+                        QLog(LogLevel.Info, "Subscribing to hint " + hint.Name + ", index " + index);
                         hint.Subscribe(CollisionEventType.Trigger, (data) => HintCollide(data, index));
                     }
-
-                    Collectors[trigger.ComponentId] = new Dictionary<SessionId, CollectionState>();
                 }
             }
 
             if (rbs == 0)
             {
-                Log.Write(LogLevel.Error, "Quest Objective Trigger", "Must be attached to a trigger volume or have Trigger Volumes set in Extra Objectives.");
+                QLog(LogLevel.Error, "Must be attached to a trigger volume or have Trigger Volumes set in Extra Objectives.");
                 return;
             }
 
@@ -126,7 +145,7 @@ namespace ScriptLibrary
             SubscribeToAll(DisableEvent, (ScriptEventData) => { ScriptEnabled = false; });
             ScriptEnabled = StartEnabled;
 
-            Timer.Create(3, 73, Cleanup);
+            Timer.Create(300, 500, Cleanup);
         }
 
         // Try and clean up stale values. 
@@ -140,6 +159,7 @@ namespace ScriptLibrary
                     if (collector.Value == CollectionState.None
                         || ScenePrivate.FindAgent(collector.Key) == null)
                     {
+                        QLog(LogLevel.Info, "Removing user.");
                         ToRemove.Add(collector.Key);
                     }
                 }
@@ -193,17 +213,31 @@ namespace ScriptLibrary
                 try
                 {
                     AgentPrivate agent = ScenePrivate.FindAgent(collisionData.HitComponentId.ObjectId);
-                    if (agent == null) return;
+                    if (agent == null)
+                    {
+                        QLog(LogLevel.Info, "No agent found.");
+                        return;
+                    }
 
                     SessionId sessionId = GloballyCollect ? SessionId.Invalid : agent.AgentInfo.SessionId;
-
                     var state = GetState(index, sessionId);
+
+                    QLog(LogLevel.Info, "Phase=" + collisionData.Phase + ", state=" + state.ToString() + ", Global:" + GloballyCollect, agent.AgentInfo.SessionId);
                     if (collisionData.Phase == CollisionEventPhase.TriggerEnter)
                     {
                         if (state == CollectionState.Active)
                         {
                             // agentInfo and agentInfo.SessionId are both cached and do not need try/catch if agent isn't null.
                             CollectObjective(agent.AgentInfo.SessionId, index);
+                        }
+                        else
+                        {
+                            // Maybe this isn't even a NofM quest and things are just weird?
+                            if (ObjectiveDefinition.RequiredCount <= 1)
+                            {
+                                QLog(LogLevel.Warning, "Non-NoM quest with weird state: collecting anyway.");
+                                CollectObjective(agent.AgentInfo.SessionId, index);
+                            }
                         }
                     }
                     else if (collisionData.Phase == CollisionEventPhase.TriggerExit)
@@ -214,47 +248,83 @@ namespace ScriptLibrary
                         }
                     }
                 }
-                catch (Exception) { }
+                catch (Exception e)
+                {
+                    QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+                }
+            }
+            else
+            {
+                QLog(LogLevel.Warning, "Script disabled.");
             }
         }
 
         protected override void OnObjectiveCollectCompleted(AgentInfo agentInfo, Objective objective, int newCount, int index = -1)
         {
-            if (DisableWhenCollected)
+            base.OnObjectiveCollectCompleted(agentInfo, objective, newCount, index);
+
+            try
             {
-                Collectors[TriggerObjectives[index].ComponentId].Remove(agentInfo.SessionId);
-                if (ResetDelay > 0)
+                if (DisableWhenCollected)
                 {
-                    Timer.Create(ResetDelay, () =>
-                    {
-                        try
-                        {
-                            if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
-                            {
-                                Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Active;
-                            }
-                        }
-                        catch(Exception) { }
-                    });
+                    Collectors[index].Remove(agentInfo.SessionId);
                 }
+                else
+                {
+                    if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
+                    {
+                        Collectors[index][agentInfo.SessionId] = CollectionState.Active;
+                    }
+                    else
+                    {
+                        Collectors[index].Remove(agentInfo.SessionId);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+            }
+
+            if (DisableWhenCollected && ResetDelay > 0)
+            {
+                Timer.Create(ResetDelay, () =>
+                {
+                    try
+                    {
+                        if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
+                        {
+                            Collectors[index][agentInfo.SessionId] = CollectionState.Active;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+                    }
+                });
             }
         }
 
         protected override void OnObjectiveCollectCanceled(AgentInfo agentInfo, Objective objective, int index = -1)
         {
+            base.OnObjectiveCollectCanceled(agentInfo, objective, index);
             try
             {
                 if (objective.IsValid && objective.GetState() == ObjectiveState.Active)
                 {
-                    Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Active;
+                    Collectors[index][agentInfo.SessionId] = CollectionState.Active;
                 }
             }
-            catch (Exception) { }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+            }
         }
 
         protected override void OnObjectiveCollectStarted(AgentInfo agentInfo, Objective objective, int index = -1)
         {
-            Collectors[TriggerObjectives[index].ComponentId][agentInfo.SessionId] = CollectionState.Collecting;
+            base.OnObjectiveCollectStarted(agentInfo, objective, index);
+            Collectors[index][agentInfo.SessionId] = CollectionState.Collecting;
 
             if (HintText != "")
             {
@@ -266,7 +336,10 @@ namespace ScriptLibrary
                         agent.Client.UI.HintText = "";
                     }
                 }
-                catch (Exception) { }
+                catch (Exception e)
+                {
+                    QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+                }
             }
         }
 
@@ -274,13 +347,20 @@ namespace ScriptLibrary
         {
             foreach (var objectiveCollectors in Collectors)
             {
-                if (enabled)
+                try
                 {
-                    objectiveCollectors.Value[session] = CollectionState.Active;
+                    if (enabled)
+                    {
+                        objectiveCollectors.Value[session] = CollectionState.Active;
+                    }
+                    else
+                    {
+                        objectiveCollectors.Value.Remove(session);
+                    }
                 }
-                else
+                catch(Exception e)
                 {
-                    objectiveCollectors.Value.Remove(session);
+                    QLog(LogLevel.Error, "Exception " + e.GetType() + ": " + e.ToString());
                 }
             }
         }
@@ -303,14 +383,30 @@ namespace ScriptLibrary
             ResetSession(agentInfo.SessionId, false);
         }
 
-        protected override void OnObjectiveReset(AgentInfo agentInfo, Objective objective)
+        protected override void OnObjectiveReset(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
             base.OnObjectiveReset(agentInfo, objective);
             try
             {
                 ResetSession(agentInfo.SessionId, objective.GetState() == ObjectiveState.Active);
             }
-            catch (Exception) { }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+            }
+        }
+
+        protected override void OnObjectiveJoinExperience(AgentInfo agentInfo, Objective objective)
+        {
+            base.OnObjectiveJoinExperience(agentInfo, objective);
+            try
+            {
+                ResetSession(agentInfo.SessionId, objective.GetState() == ObjectiveState.Active);
+            }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().Name + ": " + e.ToString());
+            }
         }
     }
 }

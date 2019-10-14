@@ -192,6 +192,11 @@ To send or receive events to/from a specific group from outside that group appen
         [DisplayName("Group")]
         public string Group = "";
 
+        [DisplayName("Fast Start")]
+        [Tooltip("Fast Start\nEnabling Fast Start will skip waiting for debugger initialization. This means debug logs from early in the script's initialization may be missed or lost.\n\nWARNING: Enable only if the 1.5s delay at initialization when no debugger is in the scene is really killing you.")]
+        [DefaultValue(false)]
+        public bool FastStart = false;
+
         internal IDebug __SimpleDebugger = new DebugDisabled();
         internal string __SimpleTag = "";
 
@@ -228,10 +233,13 @@ To send or receive events to/from a specific group from outside that group appen
         {
             __SimpleTag = GetType().Name + " [S:" + Script.ID.ToString() + " O:" + ObjectPrivate.ObjectId.ToString() + "]";
             StartCoroutine(FindDebugger, 0.1);
-            Yield();
 
-            int retries = 15;
-            while (!foundDebugger && --retries > 0) Wait(0.1);
+            if (!FastStart)
+            {
+                Yield();
+                int retries = 15;
+                while (!foundDebugger && --retries > 0) Wait(0.1);
+            }
 
             SimpleInit();
         }

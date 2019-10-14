@@ -120,11 +120,8 @@ namespace ScriptLibrary
 
         Action Unsubscribes = null;
 
-        protected override void SimpleInit()
+        protected override void InitObjective()
         {
-            base.SimpleInit();
-            if (BaseErrored) return;
-
             if (StartEnabled) Subscribe(null);
 
             SubscribeToAll(EnableEvent, Subscribe);

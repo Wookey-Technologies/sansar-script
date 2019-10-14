@@ -14,6 +14,7 @@ using Sansar.Simulation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace ScriptLibrary
 {
@@ -45,7 +46,7 @@ namespace ScriptLibrary
         public string CollectText;
 
         [Tooltip("Collect Color\nIf Collect Time is > 0 the collecting progress bar will be this color.")]
-        [DefaultValue(0.1f,0.8f,0.3f)]
+        [DefaultValue(0.1294f,0.7373f,0.8118f)]
         [DisplayName("Collect Color")]
         public Color CollectColor;
 
@@ -57,7 +58,7 @@ namespace ScriptLibrary
         public float CancelDistance;
 
         [Tooltip("Collected Hint\nIf set a hint will be shown briefly after a hint is collected. If the quest has a required count the hint will include the progress on that collection.")]
-        [DefaultValue(true)]
+        [DefaultValue(false)]
         [DisplayName("Collected Hint")]
         public bool CollectedHintsEnabled = true;
 
@@ -76,106 +77,195 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
         [DefaultValue(true)]
         [DisplayName("Start Enabled")]
         public readonly bool StartEnabled = true;
+
+        [Tooltip("Enable Debug to log extra data to the script debug console for this script.")]
+        [DefaultValue(false)]
+        [DisplayName("Debug")]
+        public readonly bool DebugSpam = false;
         #endregion
 
-        HashSet<SessionId> activeSessionIds = new HashSet<SessionId>();
+        Dictionary<SessionId,Objective> activeSessionIds = new Dictionary<SessionId,Objective>();
         float CancelDistanceSquared = 0;
-        protected bool BaseErrored = false;
 
-        protected override void SimpleInit()
+        protected bool IsTracked(SessionId id) { return activeSessionIds.ContainsKey(id); }
+
+        protected void QLog(LogLevel level, string message, SessionId sessionId, [CallerMemberName] string caller = "<???>")
         {
+            try
+            {
+                if (DebugSpam || level == LogLevel.Error)
+                {
+                    string agentString = "<user-unknown>";
+                    AgentInfo agent = ScenePrivate.FindAgent(sessionId)?.AgentInfo;
+                    if (agent != null)
+                    {
+                        agentString = agent.Handle + ":" + agent.AvatarUuid;
+                    }
+                    string definitionString = "<objective-unknown>";
+                    if (ObjectiveDefinition == null)
+                    {
+                        definitionString = "<objective-null>";
+                    }
+                    else if (!ObjectiveDefinition.Ready)
+                    {
+                        definitionString = "<objective-not-ready>";
+                    }
+                    else
+                    {
+                        definitionString = ObjectiveDefinition.Title;
+                    }
+                    Log.Write(level, ObjectPrivate.Name + ":" + GetType().Name + " > '" + definitionString + "' for user " + agentString);
+                    Log.Write(level, caller + " > " + message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Exception logging quest objective details: " + ex.GetType().Name);
+                Log.Write(ex.ToString());
+            }
+        }
+
+        protected void QLog(LogLevel level, string message, [CallerMemberName] string caller = "<???>")
+        {
+            try
+            {
+                if (DebugSpam || level == LogLevel.Error)
+                {
+                    string definitionString = "<objective-unknown>";
+                    if (ObjectiveDefinition == null)
+                    {
+                        definitionString = "<objective-null>";
+                    }
+                    else if (!ObjectiveDefinition.Ready)
+                    {
+                        definitionString = "<objective-not-ready>";
+                    }
+                    else
+                    {
+                        definitionString = ObjectiveDefinition.Title;
+                    }
+                    Log.Write(level, ObjectPrivate.Name + ":" + GetType().Name + " > '" + definitionString);
+                    Log.Write(level, caller + " > " + message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Exception logging quest objective details: " + ex.GetType().Name);
+                Log.Write(ex.ToString());
+            }
+        }
+
+        protected sealed override void SimpleInit()
+        {
+            Script.UnhandledException += UnhandledException;
+
             CancelDistanceSquared = CancelDistance * CancelDistance;
-            var addUserSubscription = ScenePrivate.User.Subscribe(User.AddUser, OnAddUser);
+            
+            if (ObjectiveDefinition == null)
+            {
+                QLog(LogLevel.Error, "Objective Definition not found.");
+                return;
+            }
+
+            ObjectiveDefinition.Update(DefinitionUpdate);
+        }
+
+        public void UnhandledException(Object o, Exception e)
+        {
+            QLog(LogLevel.Error, "Unhandled exception: " + e.GetType().Name + "\n" + e.ToString());
+        }
+
+        protected abstract void InitObjective();
+
+        void DefinitionUpdate(OperationCompleteEvent data)
+        { 
+            if (!data.Success || !ObjectiveDefinition.Ready)
+            {
+                QLog(LogLevel.Error, "Failed to update objective definition.");
+                return;
+            }
+
+            InitObjective();
+
+            ScenePrivate.User.Subscribe(User.AddUser, OnAddUser);
+            ScenePrivate.User.Subscribe(User.RemoveUser, OnRemoveUser);
 
             // for edge case where users can join scene before AddUser subscription is added
             foreach (var agent in ScenePrivate.GetAgents())
             {
-                OnAddAgent(agent);
+                try
+                {
+                    OnAddAgent(agent.AgentInfo.SessionId);
+                }
+                catch (Exception) { }
             }
-
-            var removeUserSubscription = ScenePrivate.User.Subscribe(User.RemoveUser, (UserData data) =>
-            {
-                activeSessionIds.Remove(data.User);
-            });
-
-            if (!VerifyDefinition())
-            {
-                addUserSubscription.Unsubscribe();
-                removeUserSubscription.Unsubscribe();
-                BaseErrored = true;
-            }
-        }
-
-        bool VerifyDefinition()
-        { 
-            if (ObjectiveDefinition == null)
-            {
-                Log.Write(LogLevel.Error, "Objective Definition not found.");
-                return false;
-            }
-
-            if (ObjectiveDefinition.Ready)
-            {
-                return true;
-            }
-
-            var update = WaitFor(ObjectiveDefinition.Update);
-
-            if (!update.Success)
-            {
-                Log.Write(LogLevel.Error, "Failed to update objective definition.");
-                return false;
-            }
-
-            return true;
         }
 
         protected void CollectObjective(SessionId session, int index = -1)
         {
-            var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, session) as ObjectiveDefinition.GetObjectiveData;
-
-            if (objectiveData.Success)
+            Objective objective = null;
+            if (!activeSessionIds.TryGetValue(session, out objective) || objective == null)
             {
-                try
+                var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, session) as ObjectiveDefinition.GetObjectiveData;
+                if (objectiveData.Success)
                 {
-                    if (objectiveData.Objective.GetState() != ObjectiveState.Active)
-                    {
-                        return;
-                    }
-                } catch (Exception) { }
-
-                AgentPrivate ap = ScenePrivate.FindAgent(session);
-                if (ap == null) return;
-
-                if (CollectTime == 0)
+                    objective = objectiveData.Objective;
+                    activeSessionIds[session] = objective;
+                }
+                else
                 {
-                    OnObjectiveCollectStarted(ap.AgentInfo, objectiveData.Objective, index);
-                    FinalizeCollectObjective(ap.AgentInfo, objectiveData.Objective, index);
+                    QLog(LogLevel.Warning, "Failure getting objective for session", session);
+                    return;
+                }
+            }
+
+            AgentPrivate ap = ScenePrivate.FindAgent(session);
+            if (ap == null || !objective.IsValid)
+            {
+                QLog(LogLevel.Info, "Stale session information.", session);
+                activeSessionIds.Remove(session);
+                return;
+            }
+
+            try
+            {
+                if (objective.GetState() != ObjectiveState.Active)
+                {
+                    QLog(LogLevel.Info, "Trying to collect non-active objective.", session);
                     return;
                 }
 
-                try
+                if (CollectTime == 0)
                 {
-                    if (ap.Client.UI.GetProgressBars().Count() == 0)
+                    OnObjectiveCollectStarted(ap.AgentInfo, objective, index);
+                    FinalizeCollectObjective(ap.AgentInfo, objective, index);
+                    return;
+                }
+
+                if (ap.Client.UI.GetProgressBars().Count() == 0)
+                {
+                    var bar = ap.Client.UI.AddProgressBar();
+
+                    OnObjectiveCollectStarted(ap.AgentInfo, objective, index);
+                    bar.Start(CollectText, CollectTime, CollectColor, (data) =>
                     {
-                        OnObjectiveCollectStarted(ap.AgentInfo, objectiveData.Objective, index);
-                        var bar = ap.Client.UI.AddProgressBar();
-                        bar.Start(CollectText, (float)CollectTime, CollectColor, (data) => 
+                        try
                         {
                             if (data.Success)
-                                FinalizeCollectObjective(ap.AgentInfo, objectiveData.Objective, index);
+                                FinalizeCollectObjective(ap.AgentInfo, objective, index);
                             else
-                                OnObjectiveCollectCanceled(ap.AgentInfo, objectiveData.Objective, index);
-                        });
-
-                        if (CancelDistance > 0.001)
-                        {
-                            StartCoroutine(DistanceCheck, ap, bar, index);
+                                OnObjectiveCollectCanceled(ap.AgentInfo, objective, index);
                         }
+                        catch(Exception) { }
+                    });
+                    
+                    if (CancelDistance > 0.001)
+                    {
+                        StartCoroutine(DistanceCheck, ap, bar, index);
                     }
                 }
-                catch (Exception) { }
             }
+            catch (Exception) { }
         }
 
         protected void DistanceCheck(AgentPrivate agent, UIProgressBar bar, int index = -1)
@@ -232,7 +322,7 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
                             if (bar.Label == CollectText)
                             {
                                 bar.Cancel();
-                                break;
+                                return;
                             }
                         }
                     }
@@ -264,12 +354,22 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
             catch (Exception) { }
         }
 
+        AgentInfo AgentFromObjective(Objective objective)
+        {
+            try
+            {
+                return ScenePrivate.FindAgent(objective.Agent)?.AgentInfo;
+            }
+            catch (Exception) { }
+            return null;
+        }
+
         void CollectedHint(Objective objective, int collectedSoFar)
         {
             try
             {
                 string hint = null;
-                if (objective.Definition.RequiredCount < 1)
+                if (objective.Definition.RequiredCount <= 1)
                 {
                     hint = $"Completed: {objective.Definition.Title}";
                 }
@@ -286,137 +386,162 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
             catch (Exception) { }
         }
 
-        void OnAddUser(UserData data)
+        private void OnRemoveUser(UserData data)
         {
-            AgentPrivate agent = ScenePrivate.FindAgent(data.User);
-            OnAddAgent(agent);
+            activeSessionIds.Remove(data.User);
         }
 
-        void OnAddAgent(AgentPrivate agent)
-        { 
-            if (agent == null || !agent.IsValid)
+        void OnAddUser(UserData data)
+        {
+            OnAddAgent(data.User);
+        }
+
+        private void ForwardCallback(ObjectiveData d, Action<AgentInfo,Objective,bool> call)
+        {
+            try
             {
+                var objective = activeSessionIds[d.AgentId];
+                if (objective == null)
+                {
+                    QLog(LogLevel.Info, "Stale agent.", d.AgentId);
+                    return;
+                }
+
+                var info = AgentFromObjective(objective);
+                if (info != null && objective.IsValid)
+                {
+                    call(info, objective, false);
+                }
+                else
+                {
+                    QLog(LogLevel.Warning, "Invalid agent or objective.", d.AgentId);
+                }
+            }
+            catch (NullReferenceException nre) when (nre.Message == "Null internal reference.")
+            {
+                QLog(LogLevel.Warning, "Null internal reference.", d.AgentId);
+            }
+            catch(Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().ToString() + " forwarding " + call.Target.ToString());
+            }
+        }
+
+        protected void OnAddAgent(SessionId agentId)
+        {
+            if (agentId == SessionId.Invalid)
+            {
+                QLog(LogLevel.Error, "Invalid session id");
                 return;
             }
 
-            Objective objective = null;
-            AgentInfo agentInfo = null;
+            if (activeSessionIds.ContainsKey(agentId))
+            {
+                QLog(LogLevel.Error, "Already tracking this user", agentId);
+                return;
+            }
+
+            AgentPrivate agent = ScenePrivate.FindAgent(agentId);
+            if (agent == null || !agent.IsValid)
+            {
+                QLog(LogLevel.Warning, "Invalid or missing agent.");
+                return;
+            }
+
+            var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, agentId) as ObjectiveDefinition.GetObjectiveData;
+            if (!objectiveData.Success || objectiveData.Objective == null)
+            {
+                QLog(LogLevel.Error, "Failed to get Objective for user.", agentId);
+                return;
+            }
 
             try
             {
-                agentInfo = agent.AgentInfo;
-            }
-            catch
-            {
-                Log.Write(LogLevel.Error, "Failed to get agent info, user may have left experience.");
-                return;
-            }
+                Objective objective = objectiveData.Objective;
+                activeSessionIds.Add(agentId,objective);
+                QLog(LogLevel.Info, $"Initial objective state: " + objective.GetState());
+                
+                objective.Subscribe(ObjectiveState.Active, (ObjectiveData d) => ForwardCallback(d, OnObjectiveActive));
+                objective.Subscribe(ObjectiveState.Locked, (ObjectiveData d) => ForwardCallback(d, OnObjectiveLocked));
+                objective.Subscribe(ObjectiveState.Completed, (ObjectiveData d) => ForwardCallback(d, OnObjectiveCompleted));
+                objective.Subscribe(ObjectiveState.None, (ObjectiveData d) => ForwardCallback(d, OnObjectiveReset));
 
-            if (!VerifyDefinition())
-            {
-                return;
-            }
-
-            var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, agentInfo.SessionId) as ObjectiveDefinition.GetObjectiveData;
-            if (objectiveData.Success)
-            {
-                objective = objectiveData.Objective;
-            }
-
-
-            if (objective != null && !activeSessionIds.Contains(agentInfo.SessionId))
-            {
-                try
+                AgentInfo agentInfo = ScenePrivate.FindAgent(agentId)?.AgentInfo;
+                switch (objective.GetState())
                 {
-                    activeSessionIds.Add(agentInfo.SessionId);
-                    SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  quest: {objective.Definition.Title} state: {objective.GetState()}");
+                    case ObjectiveState.Active:
+                        OnObjectiveActive(agentInfo, objective, true);
+                        break;
 
-                    switch (objective.GetState())
-                    {
-                        case ObjectiveState.Active:
-                            OnObjectiveActive(agentInfo, objective, true);
-                            break;
+                    case ObjectiveState.Locked:
+                        OnObjectiveLocked(agentInfo, objective, true);
+                        break;
 
-                        case ObjectiveState.Locked:
-                            OnObjectiveLocked(agentInfo, objective, true);
-                            break;
+                    case ObjectiveState.Completed:
+                        OnObjectiveCompleted(agentInfo, objective, true);
+                        break;
 
-                        case ObjectiveState.Completed:
-                            OnObjectiveCompleted(agentInfo, objective, true);
-                            break;
-                    }
+                    case ObjectiveState.None:
+                        OnObjectiveReset(agentInfo, objective, true);
+                        break;
 
-                    objective.Subscribe(ObjectiveState.Active, (ObjectiveData d) =>
-                    {
-                        OnObjectiveActive(agentInfo, objective);
-                    });
-
-                    objective.Subscribe(ObjectiveState.Locked, (ObjectiveData d) =>
-                    {
-                        OnObjectiveLocked(agentInfo, objective);
-                    });
-
-                    objective.Subscribe(ObjectiveState.Completed, (ObjectiveData d) =>
-                    {
-                        OnObjectiveCompleted(agentInfo, objective);
-                    });
-
-                    objective.Subscribe(ObjectiveState.None, (ObjectiveData d) =>
-                    {
-                        OnObjectiveReset(agentInfo, objective);
-                    });
+                    default:
+                        break;
                 }
-                catch (Exception) { }
 
                 OnObjectiveJoinExperience(agentInfo, objective);
+            }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Error, "Exception " + e.GetType().Name + ":\n" + e.ToString());
             }
         }
 
         protected virtual void OnObjectiveCollectCompleted(AgentInfo agentInfo, Objective objective, int newCount, int index = -1)
         {
-
+            QLog(LogLevel.Info, "OnObjectiveCollectCompleted.", agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveCollectCanceled(AgentInfo agentInfo, Objective objective, int index = -1)
         {
-
+            QLog(LogLevel.Info, "OnObjectiveCollectCanceled.", agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveCollectStarted(AgentInfo agentInfo, Objective objective, int index = -1)
         {
-
+            QLog(LogLevel.Info, "OnObjectiveCollectStarted.", agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveJoinExperience(AgentInfo agentInfo, Objective objective)
         {
+            QLog(LogLevel.Info, "OnObjectiveJoinExperience.", agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveActive(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  objective: {objective.Definition.Title} Active."); } catch (Exception) { }
+            QLog(LogLevel.Info, "OnObjectiveActive. InitialJoin = " + initialJoin, agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveLocked(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            try { SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  objective: {objective.Definition.Title} Locked."); } catch (Exception) { }
+            QLog(LogLevel.Info, "OnObjectiveLocked. InitialJoin = " + initialJoin, agentInfo.SessionId);
         }
 
         protected virtual void OnObjectiveCompleted(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            try {SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  objective: {objective.Definition.Title} Completed."); } catch (Exception) { }
+            QLog(LogLevel.Info, "OnObjectiveCompleted. InitialJoin = " + initialJoin, agentInfo.SessionId);
         }
 
-        protected virtual void OnObjectiveReset(AgentInfo agentInfo, Objective objective)
+        protected virtual void OnObjectiveReset(AgentInfo agentInfo, Objective objective, bool initialJoin = false)
         {
-            try {SimpleLog(LogLevel.Info, $"agent: {agentInfo.Name}  objective: {objective.Definition.Title} Reset."); } catch (Exception) { }
+            QLog(LogLevel.Info, "OnObjectiveReset. InitialJoin = " + initialJoin, agentInfo.SessionId);
         }
 
         protected SimpleData GetEventData(AgentInfo agentInfo)
         {
             SimpleData data = new SimpleData(this);
             data.AgentInfo = agentInfo;
-            data.ObjectId = agentInfo.ObjectId;
-            data.ObjectId = data.AgentInfo != null ? data.AgentInfo.ObjectId : ObjectPrivate.ObjectId;
+            data.ObjectId = agentInfo != null ? agentInfo.ObjectId : ObjectPrivate.ObjectId;
             data.SourceObjectId = ObjectPrivate.ObjectId;
             return data;
         }
@@ -429,7 +554,6 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
             data.ObjectId = data.AgentInfo != null ? data.AgentInfo.ObjectId : source;
             return data;
         }
-
     }
 }
 
