@@ -27,16 +27,27 @@ public class AccessControl : SceneObjectScript
     public bool DebugLogging;
     #endregion
 
+    private RigidBodyComponent _rb;
+
     private List<string> Admins = new List<string>(); // handle
 
     public override void Init()
     {
+        // get the holding vestibule rigid body
+        if (!ObjectPrivate.TryGetFirstComponent(out _rb))
+        {
+            if (DebugLogging) Log.Write("Script not running on an object with a physics volume!");
+        } else
+        {
+            if (DebugLogging) Log.Write("RigidBody found!");
+        }
+
         // Subscribe to Add User events
         // ---------------------------------------------->start coroutine TrackUser send it UserData
         ScenePrivate.User.Subscribe(User.AddUser, SessionId.Invalid, (UserData data) => StartCoroutine(TrackUser, data.User), true);
         if (DebugLogging) Log.Write("Subscribed to TrackUser");
 
-        //Add admins if any
+        //Add admins, scene owner is automatically added
         Admins.AddRange(AdminHandles.Trim().ToLower().Split(new char[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries));
         Admins.Add(ScenePrivate.SceneInfo.AvatarId);
 
@@ -46,7 +57,15 @@ public class AccessControl : SceneObjectScript
 
     bool IsAdmin(AgentPrivate agent)
     {
-        if (DebugLogging) Log.Write(agent.AgentInfo.Handle + " IsAdmin" + Admins.Contains(agent.AgentInfo.Handle.ToLower()));
+        if (DebugLogging) Log.Write(agent.AgentInfo.Handle + " IsAdmin: " + Admins.Contains(agent.AgentInfo.Handle.ToLower()));
+        return agent != null && Admins.Contains(agent.AgentInfo.Handle.ToLower());
+    }
+
+    bool IsBanned(AgentPrivate agent)
+    {
+        //isAdmin ? false : 
+
+        //if (DebugLogging) Log.Write(agent.AgentInfo.Handle + " IsBanned: " + );
         return agent != null && Admins.Contains(agent.AgentInfo.Handle.ToLower());
     }
 
@@ -54,6 +73,8 @@ public class AccessControl : SceneObjectScript
     {
         public string Name { get; internal set; }
         public AgentPrivate Agent { get; internal set;  }
+        public bool isAdmin { get; internal set; }
+        public bool isBanned { get; internal set; }
     }
 
     private Dictionary<string, Visitor> Visitors = new Dictionary<string, Visitor>();
@@ -66,23 +87,21 @@ public class AccessControl : SceneObjectScript
 
         if (DebugLogging) Log.Write(name, " has entered.");
 
-        //if visitor is found in list
-        if (Visitors.TryGetValue(name, out visitor))
-        {
-            //is access restricted?
-            if (!DoorsOpen)
-            {
-                if (DebugLogging) Log.Write("doors closed");
-                //send chat to admins asking what to do
-            }
-
-            return;
-
-        } else
+        //if visitor is not found in list add them to the list
+        if (!Visitors.TryGetValue(name, out visitor))
         {
             //log user entry
             LogEntry(agent);
         }
+
+        SetAccess(agent);
+
+        if(IsBanned(agent))
+        {
+            //ask for permission to enter
+
+        }
+
     }
 
     private void LogEntry(AgentPrivate agent)
@@ -92,6 +111,8 @@ public class AccessControl : SceneObjectScript
         Visitor visitor = new Visitor();
         visitor.Agent = agent;
         visitor.Name = agent.AgentInfo.Name;
+        visitor.isAdmin = IsAdmin(agent);
+        visitor.isBanned = visitor.isAdmin ? false : !DoorsOpen;
         Visitors[key.ToString()] = visitor;
 
         if (DebugLogging) Log.Write("Visitor entry has been logged");
@@ -114,7 +135,8 @@ public class AccessControl : SceneObjectScript
 
         if (IsAdmin(agent) || agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid)
         {
-            StartCoroutine(ShowStats, agent);
+            //StartCoroutine(ShowStats, agent);
+            ShowStats(agent);
         }
     }
 
@@ -124,6 +146,8 @@ public class AccessControl : SceneObjectScript
         foreach (var visitor in Visitors)
         {
             message += "Name: " + visitor.Value.Name;
+            message += " - isAdmin: " + visitor.Value.isAdmin + ", isBanned " + visitor.Value.isBanned;
+            message += " - isBanned " + visitor.Value.isBanned;
         }
         return message;
     }
@@ -133,5 +157,16 @@ public class AccessControl : SceneObjectScript
         agent.SendChat(getLogMessage());
     }
 
+    private void SetAccess(AgentPrivate agent)
+    {
+        if (DebugLogging) Log.Write("Setting Access: " + IsBanned(agent));
+        agent.IgnoreCollisionWith(_rb, IsBanned(agent));
+    }
+
+    private void CheckAccess()
+    {
+        if (DebugLogging) Log.Write("Checking Access");
+
+    }
 
 }
