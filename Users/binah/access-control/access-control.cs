@@ -20,12 +20,18 @@ public class AccessControl : SceneObjectScript
     public bool DoorsOpen;
 
     [DefaultValue("/showlog")]
+    [Tooltip("Shows visitor log, door open state and banlist")]
     [DisplayName("Chat Command")]
     public readonly string VisitorListCommand = "/showlog";
 
     [DefaultValue("/toggleDoor")]
+    [Tooltip("Toggle door open state")]
     [DisplayName("Chat Command")]
     public readonly string ToggleDoorCommand = "/toggleDoor";
+
+    [DefaultValue("/ban handle")]
+    [DisplayName("Chat Command")]
+    public readonly string BanCommand = "/ban";
 
     [DisplayName("Banned Destination")]
     [Tooltip("The destination to send banned users.")]
@@ -60,6 +66,12 @@ public class AccessControl : SceneObjectScript
         //Add admins, scene owner is automatically added
         Admins.AddRange(AdminHandles.Trim().ToLower().Split(new char[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries));
         Admins.Add(ScenePrivate.SceneInfo.AvatarId);
+
+        if(Admins.Count == 1)
+        {
+            //failsafe to not lock visitors into a cube when no admin is around
+            DoorsOpen = true;
+        }
 
         // listen for commands
         ScenePrivate.Chat.Subscribe(0, null, ShowLogCommand);
@@ -203,7 +215,7 @@ public class AccessControl : SceneObjectScript
         //if on ban list remove them
         if(IsBanned(agent))
         {
-            Banned.RemoveAll(a => a == agent.AgentInfo.Handle.ToLower());
+            RemoveUserBan(agent);
         }
         //setAccess
         SetAccess(agent);
@@ -224,9 +236,7 @@ public class AccessControl : SceneObjectScript
             } else
             {
                 if (DebugLogging) Log.Write("Entry was denied.");
-                Banned.Add(agent.AgentInfo.Handle.ToLower());
-                if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
-                Bannish(agent);
+                BanUser(agent);
             }
         });
     }
@@ -241,5 +251,18 @@ public class AccessControl : SceneObjectScript
 
         if (DebugLogging) Log.Write("ToggleDoors: " + !DoorsOpen);
         DoorsOpen = !DoorsOpen;
+    }
+
+    private void BanUser(AgentPrivate agent)
+    {
+        Banned.Add(agent.AgentInfo.Handle.ToLower());
+        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
+        Bannish(agent);
+    }
+
+    private void RemoveUserBan(AgentPrivate agent)
+    {
+        Banned.RemoveAll(a => a == agent.AgentInfo.Handle.ToLower());
+        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been removed from the banlist");
     }
 }
