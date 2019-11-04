@@ -29,9 +29,15 @@ public class AccessControl : SceneObjectScript
     [DisplayName("Chat Command")]
     public readonly string ToggleDoorCommand = "/toggleDoor";
 
-    [DefaultValue("/ban handle")]
+    [DefaultValue("/ban")]
+    [Tooltip("Command to ban a user")]
     [DisplayName("Chat Command")]
     public readonly string BanCommand = "/ban";
+
+    [DefaultValue("/unban")]
+    [Tooltip("Command to remove a user from banlist")]
+    [DisplayName("Chat Command")]
+    public readonly string UnBanCommand = "/unban";
 
     [DisplayName("Banned Destination")]
     [Tooltip("The destination to send banned users.")]
@@ -76,6 +82,8 @@ public class AccessControl : SceneObjectScript
         // listen for commands
         ScenePrivate.Chat.Subscribe(0, null, ShowLogCommand);
         ScenePrivate.Chat.Subscribe(0, null, ToggleDoors);
+        ScenePrivate.Chat.Subscribe(0, null, OnBanCommand);
+        ScenePrivate.Chat.Subscribe(0, null, OnUnBanCommand);
     }
 
 
@@ -145,27 +153,6 @@ public class AccessControl : SceneObjectScript
         Visitors[agent.AgentInfo.Handle.ToLower()] = visitor;
 
         if (DebugLogging) Log.Write("Visitor entry has been logged");
-    }
-
-    private void ShowLogCommand(ChatData data)
-    {
-        // Checking the message is the fastest thing we could do here. Discard anything that isn't the command we are looking for.
-        if (data.Message != VisitorListCommand)
-        {
-            return;
-        }
-
-        AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
-        if (agent == null)
-        { 
-            if (DebugLogging) Log.Write("Possible race condition and they already logged off.");
-            return;
-        }
-
-        if (IsAdmin(agent) || agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid)
-        {
-            ShowLog(agent);
-        }
     }
 
     private string getLogMessage()
@@ -241,6 +228,19 @@ public class AccessControl : SceneObjectScript
         });
     }
 
+    private void BanUser(AgentPrivate agent)
+    {
+        Banned.Add(agent.AgentInfo.Handle.ToLower());
+        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
+        Bannish(agent);
+    }
+
+    private void RemoveUserBan(AgentPrivate agent)
+    {
+        Banned.RemoveAll(a => a == agent.AgentInfo.Handle.ToLower());
+        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been removed from the banlist");
+    }
+
     private void ToggleDoors(ChatData data)
     {
         if (DebugLogging) Log.Write("Toggling doors " + data);
@@ -253,16 +253,68 @@ public class AccessControl : SceneObjectScript
         DoorsOpen = !DoorsOpen;
     }
 
-    private void BanUser(AgentPrivate agent)
+    private void ShowLogCommand(ChatData data)
     {
-        Banned.Add(agent.AgentInfo.Handle.ToLower());
-        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
-        Bannish(agent);
+        // Checking the message is the fastest thing we could do here. Discard anything that isn't the command we are looking for.
+        if (data.Message != VisitorListCommand)
+        {
+            return;
+        }
+
+        AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
+        if (agent == null)
+        {
+            if (DebugLogging) Log.Write("Possible race condition and they already logged off.");
+            return;
+        }
+
+        if (IsAdmin(agent) || agent.AgentInfo.AvatarUuid == ScenePrivate.SceneInfo.AvatarUuid)
+        {
+            ShowLog(agent);
+        }
     }
 
-    private void RemoveUserBan(AgentPrivate agent)
+    private void OnBanCommand(ChatData data)
     {
-        Banned.RemoveAll(a => a == agent.AgentInfo.Handle.ToLower());
-        if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been removed from the banlist");
+        if (DebugLogging) Log.Write("Ban Command triggered.");
+
+        string[] chatWords = data.Message.Split(' ');
+
+        if (String.IsNullOrEmpty(chatWords[0]) || String.IsNullOrEmpty(chatWords[1]))
+        {
+            return;
+        }
+
+        if (chatWords[0] != BanCommand)
+        {
+            return;
+        }
+
+        if (DebugLogging) Log.Write("Ban Command for  " + chatWords[1]);
+
+        Visitor revoked = Visitors[chatWords[1].ToLower()];
+        Bannish(revoked.Agent);
+    }
+
+    private void OnUnBanCommand(ChatData data)
+    {
+        if (DebugLogging) Log.Write("UnBan Command triggered.");
+
+        string[] chatWords = data.Message.Split(' ');
+
+        if (String.IsNullOrEmpty(chatWords[0]) || String.IsNullOrEmpty(chatWords[1]))
+        {
+            return;
+        }
+
+        if (chatWords[0] != UnBanCommand)
+        {
+            return;
+        }
+
+        if (DebugLogging) Log.Write("UnBan Command for  " + chatWords[1]);
+
+        Visitor granted = Visitors[chatWords[1].ToLower()];
+        RemoveUserBan(granted.Agent);
     }
 }
