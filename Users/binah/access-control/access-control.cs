@@ -119,7 +119,8 @@ public class AccessControl : SceneObjectScript
             }
         } else
         {
-            agent.Client.TeleportToUri(BannedDestination);
+            IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(1), () => { Bannish(agent); });
+            Bannish(agent);
         }
 
     }
@@ -188,10 +189,13 @@ public class AccessControl : SceneObjectScript
 
     private void Bannish(AgentPrivate agent)
     {
-
-        agent.Client.TeleportToUri(BannedDestination);
-        if (DebugLogging) Log.Write("Say goodbye to " + agent.AgentInfo.Name);
-
+        try
+        {
+            agent.Client.TeleportToUri(BannedDestination);
+            if (DebugLogging) Log.Write("Say goodbye to " + agent.AgentInfo.Name);
+        }
+        catch (NullReferenceException nre) { if (DebugLogging) Log.Write("Bannish", nre.Message); } // User Gone.
+        catch (System.Exception e) { if (DebugLogging) Log.Write("Bannish", e.ToString()); }
     }
 
     private void GrantEntry(AgentPrivate agent)
