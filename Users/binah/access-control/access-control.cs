@@ -17,11 +17,20 @@ public class AccessControl : SceneObjectScript
     [DefaultValue(true)]
     [Tooltip("Allow anyone to enter without an access check")]
     [DisplayName("DoorsOpen")]
-    public readonly bool DoorsOpen;
+    public bool DoorsOpen;
 
     [DefaultValue("/showlog")]
     [DisplayName("Chat Command")]
     public readonly string VisitorListCommand = "/showlog";
+
+    [DefaultValue("/toggleDoor")]
+    [DisplayName("Chat Command")]
+    public readonly string ToggleDoorCommand = "/toggleDoor";
+
+    [DisplayName("Banned Destination")]
+    [Tooltip("The destination to send banned users.")]
+    [DefaultValue("https://atlas.sansar.com/experiences/katylina/you-have-been-expelled")]
+    public string BannedDestination;
 
     [DefaultValue(true)]
     public bool DebugLogging;
@@ -54,6 +63,7 @@ public class AccessControl : SceneObjectScript
 
         // listen for commands
         ScenePrivate.Chat.Subscribe(0, null, ShowLogCommand);
+        ScenePrivate.Chat.Subscribe(0, null, ToggleDoors);
     }
 
 
@@ -83,24 +93,33 @@ public class AccessControl : SceneObjectScript
     private void TrackUser(SessionId userId)
     {
         AgentPrivate agent = ScenePrivate.FindAgent(userId);
-        string name = agent.AgentInfo.Name;
+        string handle = agent.AgentInfo.Handle.ToLower();
         Visitor visitor;
 
-        if (DebugLogging) Log.Write(name, " has entered.");
+        if (DebugLogging) Log.Write(handle, " has entered.");
 
         //if visitor is not found in list add them to the list
-        if (!Visitors.TryGetValue(name, out visitor))
+        if (Visitors.TryGetValue(handle, out visitor))
+        {
+            if (DebugLogging) Log.Write("Visitor entry has been found in log.");
+        } else
         {
             //log user entry
             LogEntry(agent);
         }
 
-        if(DoorsOpen || IsAdmin(agent))
+        if (!IsBanned(agent))
         {
-            SetAccess(agent);
+            if(DoorsOpen || IsAdmin(agent))
+            {
+                SetAccess(agent);
+            } else
+            {
+                StartCoroutine(AskForEntry, agent);
+            }
         } else
         {
-            StartCoroutine(AskForEntry, agent);
+            agent.Client.TeleportToUri(BannedDestination);
         }
 
     }
@@ -138,13 +157,20 @@ public class AccessControl : SceneObjectScript
 
     private string getLogMessage()
     {
-        string message = "There have been " + Visitors.Count + " visitors:\n";
+        string message = "There have been " + Visitors.Count + " visitors";
+        message += "\nThe doors are open: " + DoorsOpen;
         foreach (var visitor in Visitors)
         {
-            message += "Name: " + visitor.Value.Name;
-            message += " - isAdmin: " + visitor.Value.isAdmin + ", isBanned " + visitor.Value.isBanned;
-            message += " - isBanned " + visitor.Value.isBanned;
+            message += "\nName: " + visitor.Value.Name;
+            message += "\n - isAdmin: " + visitor.Value.isAdmin;
+            message += "\n - isBanned " + visitor.Value.isBanned;
         }
+        message += "\nThe ban list: ";
+        foreach(var b in Banned)
+        {
+            message += "\n" + b;
+        }
+
         return message;
     }
 
@@ -160,12 +186,21 @@ public class AccessControl : SceneObjectScript
         agent.IgnoreCollisionWith(_rb, !isBanned);
     }
 
+    private void Bannish(AgentPrivate agent)
+    {
+
+        agent.Client.TeleportToUri(BannedDestination);
+        if (DebugLogging) Log.Write("Say goodbye to " + agent.AgentInfo.Name);
+
+    }
+
     private void GrantEntry(AgentPrivate agent)
     {
-        //update visitor isBanned property
-        Visitor grantee = Visitors[agent.AgentInfo.Handle.ToLower()];
-        grantee.isBanned = false;
-        if (DebugLogging) Log.Write("Update visitor isBanned property: " + grantee.isBanned);
+        //if on ban list remove them
+        if(IsBanned(agent))
+        {
+            Banned.RemoveAll(a => a == agent.AgentInfo.Handle.ToLower());
+        }
         //setAccess
         SetAccess(agent);
     }
@@ -181,12 +216,26 @@ public class AccessControl : SceneObjectScript
             if(modalDialog.Response == "Yes")
             {
                 if (DebugLogging) Log.Write("Entry was granted.");
-                SetAccess(agent);
+                GrantEntry(agent);
             } else
             {
                 if (DebugLogging) Log.Write("Entry was denied.");
+                Banned.Add(agent.AgentInfo.Handle.ToLower());
+                if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
+                Bannish(agent);
             }
         });
     }
 
+    private void ToggleDoors(ChatData data)
+    {
+        if (DebugLogging) Log.Write("Toggling doors " + data);
+        if (data.Message != ToggleDoorCommand)
+        {
+            return;
+        }
+
+        if (DebugLogging) Log.Write("ToggleDoors: " + !DoorsOpen);
+        DoorsOpen = !DoorsOpen;
+    }
 }
