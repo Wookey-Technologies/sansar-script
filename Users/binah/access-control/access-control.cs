@@ -50,11 +50,9 @@ public class AccessControl : SceneObjectScript
 
     private RigidBodyComponent _rb;
 
-    /*
-     * ***change these to HashSets***
-     */
+    // TODO: change these to HashSets
     private List<string> Admins = new List<string>(); // handle
-    private List<string> Banned = new List<string>(); 
+    private List<string> Banned = new List<string>();
 
     public override void Init()
     {
@@ -62,7 +60,9 @@ public class AccessControl : SceneObjectScript
         if (!ObjectPrivate.TryGetFirstComponent(out _rb))
         {
             if (DebugLogging) Log.Write("Script not running on an object with a physics volume!");
-        } else
+            return;
+        }
+        else
         {
             if (DebugLogging) Log.Write("RigidBody found!");
         }
@@ -88,7 +88,6 @@ public class AccessControl : SceneObjectScript
         ScenePrivate.Chat.Subscribe(0, null, OnBanCommand);
         ScenePrivate.Chat.Subscribe(0, null, OnUnBanCommand);
     }
-
 
     public class Visitor
     {
@@ -191,13 +190,19 @@ public class AccessControl : SceneObjectScript
 
     private void Bannish(AgentPrivate agent)
     {
-        try
+       if(!IsAdmin(agent))
         {
-            agent.Client.TeleportToUri(BannedDestination);
-            if (DebugLogging) Log.Write("Say goodbye to " + agent.AgentInfo.Name);
+            try
+            {
+                agent.Client.TeleportToUri(BannedDestination);
+                if (DebugLogging) Log.Write("Say goodbye to " + agent.AgentInfo.Name);
+            }
+            catch (NullReferenceException nre) { if (DebugLogging) Log.Write("Bannish", nre.Message); } // User Gone.
+            catch (System.Exception e) { if (DebugLogging) Log.Write("Bannish", e.ToString()); }
+        } else
+        {
+            if (DebugLogging) Log.Write("You can't ban "+ agent.AgentInfo.Name +"they're an admin!");
         }
-        catch (NullReferenceException nre) { if (DebugLogging) Log.Write("Bannish", nre.Message); } // User Gone.
-        catch (System.Exception e) { if (DebugLogging) Log.Write("Bannish", e.ToString()); }
     }
 
     private void GrantEntry(AgentPrivate agent)
