@@ -50,6 +50,9 @@ public class AccessControl : SceneObjectScript
 
     private RigidBodyComponent _rb;
 
+    /*
+     * ***change these to HashSets***
+     */
     private List<string> Admins = new List<string>(); // handle
     private List<string> Banned = new List<string>(); 
 
@@ -75,7 +78,7 @@ public class AccessControl : SceneObjectScript
 
         if(Admins.Count == 1)
         {
-            //failsafe to not lock visitors into a cube when no admin is around
+            //failsafe to not lock visitors in holding when no admin is around
             DoorsOpen = true;
         }
 
@@ -278,14 +281,24 @@ public class AccessControl : SceneObjectScript
     {
         if (DebugLogging) Log.Write("Ban Command triggered.");
 
+        if(String.IsNullOrEmpty(data.Message))
+        {
+            return;
+        }
+
         string[] chatWords = data.Message.Split(' ');
 
-        if (String.IsNullOrEmpty(chatWords[0]) || String.IsNullOrEmpty(chatWords[1]))
+        if (String.IsNullOrEmpty(chatWords[0]))
         {
             return;
         }
 
         if (chatWords[0] != BanCommand)
+        {
+            return;
+        }
+
+        if(String.IsNullOrEmpty(chatWords[1]))
         {
             return;
         }
@@ -300,14 +313,24 @@ public class AccessControl : SceneObjectScript
     {
         if (DebugLogging) Log.Write("UnBan Command triggered.");
 
+        if (String.IsNullOrEmpty(data.Message))
+        {
+            return;
+        }
+
         string[] chatWords = data.Message.Split(' ');
 
-        if (String.IsNullOrEmpty(chatWords[0]) || String.IsNullOrEmpty(chatWords[1]))
+        if (String.IsNullOrEmpty(chatWords[0]))
         {
             return;
         }
 
         if (chatWords[0] != UnBanCommand)
+        {
+            return;
+        }
+
+        if (String.IsNullOrEmpty(chatWords[1]))
         {
             return;
         }
