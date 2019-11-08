@@ -206,19 +206,36 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
             Objective objective = null;
             if (!activeSessionIds.TryGetValue(session, out objective) || objective == null)
             {
-                var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, session) as ObjectiveDefinition.GetObjectiveData;
-                if (objectiveData.Success)
+                ObjectiveDefinition.GetObjective(session, (data) => CollectObjectiveData(data, session, index));
+            }
+            else
+            {
+                CollectObjectiveData(objective, session, index);
+            }
+        }
+
+        void CollectObjectiveData(ObjectiveDefinition.GetObjectiveData data, SessionId session, int index)
+        {
+            try
+            {
+                if (data.Success)
                 {
-                    objective = objectiveData.Objective;
-                    activeSessionIds[session] = objective;
+                    OnAddAgentData(data.Objective, session);
+                    CollectObjectiveData(data.Objective, session, index);
                 }
                 else
                 {
-                    QLog(LogLevel.Warning, "Failure getting objective for session", session);
-                    return;
+                    QLog(LogLevel.Warning, "Failed to get objective.", session);
                 }
             }
+            catch (Exception e)
+            {
+                QLog(LogLevel.Warning, "Exception getting objective. " + e.GetType().Name, session);
+            }
+        }
 
+        protected void CollectObjectiveData(Objective objective, SessionId session, int index = -1)
+        {
             AgentPrivate ap = ScenePrivate.FindAgent(session);
             if (ap == null || !objective.IsValid)
             {
@@ -448,17 +465,23 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
                 return;
             }
 
-            var objectiveData = WaitFor(ObjectiveDefinition.GetObjective, agentId) as ObjectiveDefinition.GetObjectiveData;
-            if (!objectiveData.Success || objectiveData.Objective == null)
-            {
-                QLog(LogLevel.Error, "Failed to get Objective for user.", agentId);
-                return;
-            }
+           ObjectiveDefinition.GetObjective(agentId, (data) =>
+           {
+               if (!data.Success || data.Objective == null)
+               {
+                   QLog(LogLevel.Error, "Failed to get Objective for user.", agentId);
+                   return;
+               }
 
+               OnAddAgentData(data.Objective, agentId);
+           });
+        }
+
+        void OnAddAgentData(Objective objective, SessionId agentId)
+        {
             try
             {
-                Objective objective = objectiveData.Objective;
-                activeSessionIds.Add(agentId,objective);
+                activeSessionIds[agentId] = objective;
                 QLog(LogLevel.Info, $"Initial objective state: " + objective.GetState());
                 
                 objective.Subscribe(ObjectiveState.Active, (ObjectiveData d) => ForwardCallback(d, OnObjectiveActive));

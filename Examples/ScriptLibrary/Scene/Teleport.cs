@@ -73,6 +73,11 @@ If false the destination is in scene coordinates regardless of this script's obj
         [DisplayName("Dest. Scene")]
         public readonly String DestScene;
 
+        [Tooltip("An optional target spawn point name in the destination scene.")]
+        [DefaultValue("")]
+        [DisplayName("Dest. Spawn")]
+        public readonly String DestSpawn;
+
         [Tooltip("Enable responding to events for this script. Can be a comma separated list of event names.")]
         [DefaultValue("tp_enable")]
         [DisplayName("-> Enable")]
@@ -223,7 +228,7 @@ If StartEnabled is false then the script will not respond to events until an (->
                 AgentPrivate agent = ScenePrivate.FindAgent(sessionId);
                 if (agent != null)
                 {
-                    agent.Client.TeleportToLocation(DestOwner, DestScene);
+                    agent.Client.TeleportToLocation(DestOwner, DestScene, DestSpawn);
                 }
             }
             catch (NullReferenceException nre) { SimpleLog(LogLevel.Info, "NullReferenceException remote teleporting user (maybe they just left): " + nre.Message); }

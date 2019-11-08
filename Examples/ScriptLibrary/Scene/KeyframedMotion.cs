@@ -130,12 +130,13 @@ Will be ignored if the reset motion is already in progress.")]
             thisObjectData.AgentInfo = null;
             thisObjectData.ObjectId = ObjectPrivate.ObjectId;
 
-            RigidBody.SetCenterOfMass(RotationPivot);
+            WaitFor(RigidBody.SetCenterOfMass, RotationPivot);
 
             Subscribe(null);
 
             Quaternion rotation = Quaternion.FromEulerAngles(Mathf.RadiansPerDegree * RotationOffset);
             returnRotation = ObjectPrivate.InitialRotation;
+
             movedRotation = returnRotation * rotation;
 
             numTurns = (int)((RotationOffset.Length() + 179.0f) / 360f);

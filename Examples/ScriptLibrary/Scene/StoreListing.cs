@@ -31,6 +31,16 @@ namespace ScriptLibrary
         [DefaultValue("8c664587-a520-4d7a-978d-f9d757d1f790")]
         public string ProductId;
 
+        [Tooltip("Show the user store listing.")]
+        [DefaultValue("showUserStore")]
+        [DisplayName("-> Show UserStore")]
+        public readonly string ShowUserStoreEvent;
+
+        [Tooltip("The creator handle for store listing.")]
+        [DisplayName("creatorHandle")]
+        [DefaultValue("sansar-studios")]
+        public string CreatorHandle;
+
         [Tooltip("Enable responding to events for this script. Can be a comma separated list of event names.")]
         [DefaultValue("listing_enable")]
         [DisplayName("-> Enable")]
@@ -107,6 +117,25 @@ namespace ScriptLibrary
 
                     catch (NullReferenceException nre) { SimpleLog(LogLevel.Info, "NullReferenceException showing store listing (maybe the user left): " + nre.Message); }
                     catch (Exception e) { SimpleLog(LogLevel.Error, "Exception showing store listing: " + e.Message); }
+                });
+
+                unsubscribes += SubscribeToAll(ShowUserStoreEvent, (ScriptEventData subdata) =>
+                {
+                    try
+                    {
+                        ISimpleData simpledata = subdata.Data?.AsInterface<ISimpleData>();
+                        if (simpledata != null)
+                        {
+                            AgentPrivate agent = ScenePrivate.FindAgent(simpledata.AgentInfo.SessionId);
+                            if(agent != null)
+                            {
+                                agent.Client.OpenUserStore(CreatorHandle);
+                            }
+                        }
+                    }
+
+                    catch (NullReferenceException nre) { SimpleLog(LogLevel.Info, "NullReferenceException showing user store (maybe the user left): " + nre.Message); }
+                    catch (Exception e) { SimpleLog(LogLevel.Error, "Exception showing user store: " + e.Message); }
                 });
             }
         }

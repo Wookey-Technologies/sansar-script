@@ -21,25 +21,28 @@ namespace CustomQuestScripts
         [Tooltip("Toggle Collisions\nIf enabled then the object's collision behavior will match that of the visibility. This will affect ALL volumes on any object with ANY meshes that change visibility.")]
         [DefaultValue(true)]
         public bool ToggleCollisions = false;
-        protected abstract List<MeshComponent> Meshes { get; }
+        protected abstract List<MeshComponent> ShowMeshes { get; }
+        protected abstract List<MeshComponent> HideMeshes { get; }
 
-        private List<MeshComponent> ScriptableMeshes = new List<MeshComponent>();
-        private List<RigidBodyComponent> Colliders = new List<RigidBodyComponent>();
+        private List<MeshComponent> ScriptableShowMeshes = new List<MeshComponent>();
+        private List<MeshComponent> ScriptableHideMeshes = new List<MeshComponent>();
+        private List<RigidBodyComponent> ShowColliders = new List<RigidBodyComponent>();
+        private List<RigidBodyComponent> HideColliders = new List<RigidBodyComponent>();
 
         public override void Init()
         {
             Script.UnhandledException += Script_UnhandledException;
 
-            foreach (var mesh in Meshes)
+            foreach (var mesh in ShowMeshes)
             {
                 if (mesh == null || !mesh.IsValid) continue;
 
                 if (mesh.IsScriptable)
                 {
-                    ScriptableMeshes.Add(mesh);
+                    ScriptableShowMeshes.Add(mesh);
                     mesh.SetIsVisible(false);
 
-                    findColliders(mesh.ComponentId.ObjectId);
+                    findColliders(ShowColliders, mesh.ComponentId.ObjectId);
                 }
                 else
                 {
@@ -47,7 +50,24 @@ namespace CustomQuestScripts
                 }
             }
 
-            if (ScriptableMeshes.Count == 0)
+            foreach (var mesh in HideMeshes)
+            {
+                if (mesh == null || !mesh.IsValid) continue;
+
+                if (mesh.IsScriptable)
+                {
+                    ScriptableHideMeshes.Add(mesh);
+                    mesh.SetIsVisible(true);
+
+                    findColliders(HideColliders, mesh.ComponentId.ObjectId);
+                }
+                else
+                {
+                    Log.Write(LogLevel.Error, "The mesh " + mesh.Name + " is not scriptable and will not have it's visibility changed.");
+                }
+            }
+
+            if (ScriptableShowMeshes.Count == 0 && ScriptableHideMeshes.Count == 0)
             {
                 for (uint index = 0; index < ObjectPrivate.GetComponentCount(MeshComponent.ComponentType); ++index)
                 {
@@ -55,12 +75,12 @@ namespace CustomQuestScripts
                     if (mesh == null || !mesh.IsValid) continue;
                     if (mesh.IsScriptable)
                     {
-                        ScriptableMeshes.Add(mesh);
+                        ScriptableShowMeshes.Add(mesh);
                     }
                 }
             }
 
-            if (ScriptableMeshes.Count == 0)
+            if (ScriptableShowMeshes.Count == 0 && ScriptableHideMeshes.Count == 0)
             {
                 Log.Write(LogLevel.Error, "No scriptable meshes set (and this object's meshes are not scriptable) on Quest Visibility script for object " + ObjectPrivate.Name);
                 return;
@@ -91,7 +111,7 @@ namespace CustomQuestScripts
             Log.Write(LogLevel.Error, "ERROR", "Uncaught exception '" + e.GetType().Name + "' on QuestVisibility script! ");
         }
 
-        private void findColliders(ObjectId id)
+        private void findColliders(List<RigidBodyComponent> colliders, ObjectId id)
         {
             if (!ToggleCollisions) return;
 
@@ -104,8 +124,8 @@ namespace CustomQuestScripts
                     {
                         if (rb != null)
                         {
-                            if (Colliders.Contains(rb)) return;
-                            Colliders.Add(rb);
+                            if (colliders.Contains(rb)) return;
+                            colliders.Add(rb);
                         }
                     }
                 }
@@ -136,9 +156,14 @@ namespace CustomQuestScripts
                     if (visible) VisibleToSessions.Add(id);
                     else VisibleToSessions.Remove(id);
 
-                    foreach (var mesh in ScriptableMeshes)
+                    foreach (var mesh in ScriptableShowMeshes)
                     {
                         mesh.SetIsVisible(id, visible);
+                    }
+
+                    foreach (var mesh in ScriptableHideMeshes)
+                    {
+                        mesh.SetIsVisible(id, !visible);
                     }
 
                     if (ToggleCollisions)
@@ -146,9 +171,14 @@ namespace CustomQuestScripts
                         AgentPrivate agent = ScenePrivate.FindAgent(id);
                         if (agent != null && agent.IsValid)
                         {
-                            foreach (var rb in Colliders)
+                            foreach (var rb in ShowColliders)
                             {
                                 agent.IgnoreCollisionWith(rb, !visible);
+                            }
+
+                            foreach (var rb in HideColliders)
+                            {
+                                agent.IgnoreCollisionWith(rb, visible);
                             }
                         }
                     }
@@ -161,6 +191,186 @@ namespace CustomQuestScripts
         }
     }
 
+    public class CharacterIndicators : SceneObjectScript
+    {
+        [DisplayName("Character")]
+        [Tooltip("Internal Use Only\nUse the character interface for the list of definitions.")]
+        public QuestCharacter Character;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are Active")]
+        public List<MeshComponent> OnlyActive;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are Available")]
+        public List<MeshComponent> OnlyAvailable;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are Can Turn In")]
+        public List<MeshComponent> OnlyCanTurnIn;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are either Active Or Available")]
+        public List<MeshComponent> ActiveAndAvailable;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are either Active or Can Turn In")]
+        public List<MeshComponent> ActiveAndCanTurnIn;
+
+        [Tooltip("These meshes will be visible if all non-completed character quests are either Available or Can Turn In")]
+        public List<MeshComponent> AvailableAndCanTurnIn;
+
+        [Tooltip("These meshes will be visible if there are non-completed character quests are in all three states.")]
+        [DisplayName("All")]
+        public List<MeshComponent> All;
+
+        [Tooltip("These meshes will be visible if there are no non-completed character quests.")]
+        [DisplayName("No Tracked Quests")]
+        public List<MeshComponent> None;
+
+        enum State
+        {
+            OnlyActive,
+            OnlyAvailable,
+            OnlyCanTurnIn,
+            ActiveAndAvailable,
+            ActiveAndCanTurnIn,
+            AvailableAndCanTurnIn,
+            All,
+            None
+        }
+
+        Dictionary<SessionId, State> PerUserState = new Dictionary<SessionId, State>();
+        Dictionary<State, List<MeshComponent>> MeshMap = new Dictionary<State, List<MeshComponent>>();
+
+        void SetVisibility(List<MeshComponent> meshes, SessionId session, bool visible)
+        {
+            foreach (var mesh in meshes)
+            {
+                if (mesh != null && mesh.IsValid && mesh.IsScriptable)
+                {
+                    try
+                    {
+                        mesh.SetIsVisible(session, visible);
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        void Update(SessionId session, State state)
+        {
+            if (PerUserState.TryGetValue(session, out State currentState))
+            {
+                if (currentState == state) return;
+
+                SetVisibility(MeshMap[currentState], session, false);
+                SetVisibility(MeshMap[state], session, true);
+                PerUserState[session] = state;
+            }
+            else
+            {
+                PerUserState[session] = state;
+
+                foreach (var meshes in MeshMap)
+                {
+                    if (meshes.Key != state) SetVisibility(meshes.Value, session, false);
+                }
+                SetVisibility(MeshMap[state], session, true);
+                return;
+            }
+        }
+
+        public override void Init()
+        {
+            MeshMap[State.OnlyActive] = OnlyActive;
+            MeshMap[State.OnlyAvailable] = OnlyAvailable;
+            MeshMap[State.OnlyCanTurnIn] = OnlyCanTurnIn;
+            MeshMap[State.ActiveAndAvailable] = ActiveAndAvailable;
+            MeshMap[State.ActiveAndCanTurnIn] = ActiveAndCanTurnIn;
+            MeshMap[State.AvailableAndCanTurnIn] = AvailableAndCanTurnIn;
+            MeshMap[State.All] = All;
+            MeshMap[State.None] = None;
+
+            ScenePrivate.User.Subscribe(User.RemoveUser, (userData) => OnRemoveUser(userData.User));
+            ScenePrivate.User.Subscribe(User.AddUser, (userData) => OnAddUser(userData.User));
+            foreach (var agent in ScenePrivate.GetAgents())
+            {
+                OnAddUser(agent.AgentInfo.SessionId);
+            }
+        }
+
+        public void OnRemoveUser(SessionId session)
+        {
+            PerUserState.Remove(session);
+        }
+
+        public void OnAddUser(SessionId session)
+        {
+            try
+            {
+                var tracker = Character.GetCharacterTracker(session);
+                tracker.Update((data) => HandleCharacterUpdate(data, tracker));
+            }
+            catch { }
+        }
+
+        void HandleCharacterUpdate(OperationCompleteEvent data, CharacterTracker tracker)
+        {
+            if (data.Success)
+            {
+                tracker.Subscribe((subdata) => HandleCharacterSubscribe(subdata, tracker));
+            }
+            else
+            {
+                Log.Write(LogLevel.Warning, "Error updating quest tracker for user.");
+            }
+        }
+
+        void HandleCharacterSubscribe(CharacterTrackerData data, CharacterTracker tracker)
+        {
+            if (data.SessionId != SessionId.Invalid && tracker.IsValid)
+            {
+                HandleCharacterSubscribe(data.SessionId, tracker);
+            }
+        }
+
+        void HandleCharacterSubscribe(SessionId session, CharacterTracker tracker)
+        {
+            int activeCount = tracker.ActiveQuestCount;
+            int availableCount = tracker.AvailableQuestCount;
+            int turnInCount = tracker.CanTurnInQuestCount;
+            int totalCount = activeCount + availableCount + turnInCount;
+
+            State newState = State.All;
+            if (totalCount == 0)
+            {
+                newState = State.None;
+            }
+            else if (activeCount == totalCount)
+            {
+                newState = State.OnlyActive;
+            }
+            else if (availableCount == totalCount)
+            {
+                newState = State.OnlyAvailable;
+            }
+            else if (turnInCount == totalCount)
+            {
+                newState = State.OnlyCanTurnIn;
+            }
+            else if (turnInCount == 0)
+            {
+                newState = State.ActiveAndAvailable;
+            }
+            else if (availableCount == 0)
+            {
+                newState = State.ActiveAndCanTurnIn;
+            }
+            else if (activeCount == 0)
+            {
+                newState = State.AvailableAndCanTurnIn;
+            }
+
+            StartCoroutine(Update, session, newState);
+        }
+    }
+
     [Tooltip("Internal Use Only: set visibility based on character data.")]
     public class CharacterVisibility : QuestVisibilityBase
     {
@@ -169,10 +379,15 @@ namespace CustomQuestScripts
         [Tooltip("Internal Use Only\nUse the character interface for the list of definitions.")]
         public QuestCharacter Character;
 
-        [Tooltip("Set to all meshes that should change visibility based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
-        [DisplayName("Meshes")]
-        public List<MeshComponent> _Meshes;
-        protected override List<MeshComponent> Meshes { get { return _Meshes; } }
+        [Tooltip("Set to all meshes that should SHOW based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
+        [DisplayName("Show Meshes")]
+        public List<MeshComponent> _ShowMeshes;
+        protected override List<MeshComponent> ShowMeshes { get { return _ShowMeshes; } }
+
+        [Tooltip("Set to all meshes that should HIDE based on the quest objective state. They will all change together.\nThese meshes will show ONLY when the meshes in Show Meshes are hidden.")]
+        [DisplayName("Hide Meshes")]
+        public List<MeshComponent> _HideMeshes;
+        protected override List<MeshComponent> HideMeshes { get { return _HideMeshes; } }
 
         [DisplayName("If Any")]
         [Tooltip("If enabled will set visibility according to the below options if any non-completed quests on this character match the specified state. If there is only 1 non-completed quest on this character Any and All work the same.")]
@@ -222,7 +437,7 @@ namespace CustomQuestScripts
             {
                 var tracker = Character.GetCharacterTracker(agent.AgentInfo.SessionId);
                 tracker.Update(HandleCharacterUpdate);
-                tracker.Subscribe((data) => HandleCharacterSubscribe(data,tracker));
+                tracker.Subscribe((data) => HandleCharacterSubscribe(data, tracker));
             }
             catch (Exception)
             {
@@ -293,11 +508,16 @@ namespace CustomQuestScripts
         #region EditorProperties
         [DisplayName("Quests")]
         public List<QuestDefinition> Definitions;
-     
-        [Tooltip("Set to all meshes that should change visibility based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
-        [DisplayName("Meshes")]
-        public List<MeshComponent> _Meshes;
-        protected override List<MeshComponent> Meshes { get { return _Meshes; } }
+
+        [Tooltip("Set to all meshes that should SHOW based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
+        [DisplayName("Show Meshes")]
+        public List<MeshComponent> _ShowMeshes;
+        protected override List<MeshComponent> ShowMeshes { get { return _ShowMeshes; } }
+
+        [Tooltip("Set to all meshes that should HIDE based on the quest objective state. They will all change together.\nThese meshes will show ONLY when the meshes in Show Meshes are hidden.")]
+        [DisplayName("Hide Meshes")]
+        public List<MeshComponent> _HideMeshes;
+        protected override List<MeshComponent> HideMeshes { get { return _HideMeshes; } }
 
         [DisplayName("If Any")]
         [Tooltip("If enabled will set visibility according to the below options if any quests match the specified state. If there is only 1 quest Any and All work the same.")]
@@ -363,6 +583,7 @@ namespace CustomQuestScripts
                 if (def != null)
                 {
                     defCount++;
+                    int Index = i;
                     def.Update((data) =>
                     {
                         if (!data.Success)
@@ -371,7 +592,7 @@ namespace CustomQuestScripts
                             return;
                         }
                         defCount--;
-                        All = All | (uint)(0x1 << i);
+                        All = All | (uint)(0x1 << Index);
                         if (defCount == 0) Setup(data);
                     });
                 }
@@ -393,7 +614,10 @@ namespace CustomQuestScripts
                 }
                 PerUserStatus.Remove(agent.AgentInfo.SessionId);
             }
-            catch { }
+            catch (Exception e)
+            {
+                Log.Write(LogLevel.Warning, "Exception in OnRemoveUser " + e.GetType().Name);
+            }
         }
 
         public override void OnAddUser(AgentPrivate agent)
@@ -412,7 +636,8 @@ namespace CustomQuestScripts
                     {
                         Log.Write(LogLevel.Warning, "Error getting quest state for quest for user " + agent.AgentInfo.Name + " : " + agent.AgentInfo.AvatarUuid);
                     }
-                    if (agent != null && agent.IsValid) def.GetQuest(agent, (data) => HandleQuest(data, i));
+                    int Index = i;
+                    if (agent != null && agent.IsValid) def.GetQuest(agent, (data) => HandleQuest(data, Index));
                 }
             }
             catch (Exception)
@@ -458,7 +683,7 @@ namespace CustomQuestScripts
             }
         }
 
-        
+
         void QuestStateChange(QuestData data, int index) { QuestStateChange(data.State, data.AgentId, index, false); }
         void QuestStateChange(QuestState state, SessionId agent, int index, bool isJoin = true)
         {
@@ -531,10 +756,15 @@ namespace CustomQuestScripts
         [DisplayName("Objectives")]
         public List<ObjectiveDefinition> Definitions;
 
-        [Tooltip("Set to all meshes that should change visibility based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
-        [DisplayName("Meshes")]
-        public List<MeshComponent> _Meshes;
-        protected override List<MeshComponent> Meshes { get { return _Meshes; } }
+        [Tooltip("Set to all meshes that should SHOW based on the quest objective state. They will all change together.\nIf left empty the script will change the visibility for all meshes on the same object as the script.")]
+        [DisplayName("Show Meshes")]
+        public List<MeshComponent> _ShowMeshes;
+        protected override List<MeshComponent> ShowMeshes { get { return _ShowMeshes; } }
+
+        [Tooltip("Set to all meshes that should HIDE based on the quest objective state. They will all change together.\nThese meshes will show ONLY when the meshes in Show Meshes are hidden.")]
+        [DisplayName("Hide Meshes")]
+        public List<MeshComponent> _HideMeshes;
+        protected override List<MeshComponent> HideMeshes { get { return _HideMeshes; } }
 
         [DisplayName("If Any")]
         [Tooltip("If enabled will set visibility according to the below options if any objectives match the specified state. If there is only 1 objective Any and All work the same.")]
@@ -590,6 +820,7 @@ namespace CustomQuestScripts
                 if (def != null)
                 {
                     defCount++;
+                    int Index = i;
                     def.Update((data) =>
                     {
                         if (!data.Success)
@@ -598,7 +829,7 @@ namespace CustomQuestScripts
                             return;
                         }
                         defCount--;
-                        All = All | (uint)(0x1 << i);
+                        All = All | (uint)(0x1 << Index);
                         if (defCount == 0) Setup(data);
                     });
                 }
@@ -639,7 +870,8 @@ namespace CustomQuestScripts
                     {
                         Log.Write(LogLevel.Warning, "Error getting quest state for quest for user " + agent.AgentInfo.Name + " : " + agent.AgentInfo.AvatarUuid);
                     }
-                    if (agent != null && agent.IsValid) def.GetObjective(agent, (data) => HandleObjective(data, i));
+                    int Index = i;
+                    if (agent != null && agent.IsValid) def.GetObjective(agent, (data) => HandleObjective(data, Index));
                 }
             }
             catch (Exception)
@@ -692,7 +924,15 @@ namespace CustomQuestScripts
                 Status status = null;
                 if (!PerUserStatus.TryGetValue(agent, out status))
                 {
-                    return;
+                    if (isJoin)
+                    {
+                        status = new Status();
+                        PerUserStatus[agent] = status;
+                    }
+                    else
+                    {
+                        return;
+                    }
                 }
 
                 status.Active &= ~setFlag;
