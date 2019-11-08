@@ -136,8 +136,7 @@ public class AccessControl : SceneObjectScript
         } else
         {
             //if already on banlist bannish them
-            IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(3), () => { Bannish(agent); });
-            Bannish(agent);
+            IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(1), () => { Bannish(agent); });
         }
 
     }
@@ -216,8 +215,7 @@ public class AccessControl : SceneObjectScript
             if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
         }
 
-        IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(3), () => { Bannish(agent); });
-        Bannish(agent);
+        IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(1), () => { Bannish(agent); });
     }
 
     private void RemoveUserBan(AgentPrivate agent)
