@@ -19,6 +19,12 @@ public class AccessControl : SceneObjectScript
     [DisplayName("DoorsOpen")]
     public bool DoorsOpen;
 
+    [DefaultValue(10)]
+    [Tooltip("The amount of seconds to wait to close the vote.")]
+    [Range(1.0, 100.0)]
+    [DisplayName("Voting timeout")]
+    public readonly float VoteTime = 10;
+
     [DisplayName("Banned Destination")]
     [Tooltip("The destination to send banned users.")]
     [DefaultValue("https://atlas.sansar.com/experiences/katylina/you-have-been-expelled")]
@@ -53,7 +59,7 @@ public class AccessControl : SceneObjectScript
 
         // Subscribe to Add User events
         // ---------------------------------------------->start coroutine TrackUser send it UserData
-        ScenePrivate.User.Subscribe(User.AddUser, SessionId.Invalid, (UserData data) => StartCoroutine(TrackUser, data.User), true);
+        ScenePrivate.User.Subscribe(User.AddUser, SessionId.Invalid, (UserData data) => TrackUser(data.User), true);
         if (DebugLogging) Log.Write("Subscribed to TrackUser");
 
         //Add admins, scene owner is automatically added when entering
@@ -190,7 +196,7 @@ public class AccessControl : SceneObjectScript
         {
             Visitor admin = Visitors[Admins[0]];
             ModalDialog modalDialog = admin.Agent.Client.UI.ModalDialog;
-            modalDialog.Show(message, "Yes", "No", (opc) =>
+            modalDialog.Show(message, "Yes", "No", (OperationCompleteEvent  opc) =>
             {
                 if (modalDialog.Response == "Yes")
                 {
@@ -368,7 +374,7 @@ public class AccessControl : SceneObjectScript
         try
         {
             ModalDialog modalDialog = admin.Client.UI.ModalDialog;
-            modalDialog.Show(message, "Yes", "No", (opc) =>
+            modalDialog.Show(message, "Yes", "No", (OperationCompleteEvent opc) =>
             {
                 if (modalDialog.Response == "Yes")
                 {
@@ -380,19 +386,23 @@ public class AccessControl : SceneObjectScript
                     keeps = keeps + 1;
                     if (DebugLogging) Log.Write(admin.AgentInfo.Name + " voted to keep " + agent.AgentInfo.Name);
                 }
-
-                IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(5), () => {
-                    modalDialog.Cancel();
-                    if (DebugLogging) Log.Write("kicks " + kicks + " keeps " + keeps);
-                    if(kicks > keeps)
-                    {
-                        BanUser(agent);
-                    } else
-                    {
-                        if (DebugLogging) Log.Write("Voted to keep " + agent.AgentInfo.Name);
-                    }
-                });
             });
+
+            Wait(TimeSpan.FromSeconds(VoteTime));
+
+            modalDialog.Cancel();
+
+            if (DebugLogging) Log.Write("kicks " + kicks + " keeps " + keeps);
+            if (kicks > keeps)
+            {
+                BanUser(agent);
+            }
+            else
+            {
+                if (DebugLogging) Log.Write("Voted to keep " + agent.AgentInfo.Name);
+            }
+
+
         }
         catch (Exception e)
         {
@@ -404,24 +414,29 @@ public class AccessControl : SceneObjectScript
     {
         kicks = 0;
         keeps = 0;
-        Visitor revoked = Visitors[param.ToLower()];
-
-        if (hasAdmin)
+        try
         {
-            foreach (var a in Admins)
+            Visitor revoked = Visitors[param.ToLower()];
+            if (hasAdmin)
             {
-                Visitor admin = Visitors[a];
-                VoteForEntry(admin.Agent, revoked.Agent);
+                foreach (var a in Admins)
+                {
+                    Visitor admin = Visitors[a];
+                    VoteForEntry(admin.Agent, revoked.Agent);
+                }
             }
-        } else
-        {
-            foreach (var v in Visitors)
+            else
             {
-                VoteForEntry(v.Value.Agent, revoked.Agent);
+                foreach (var v in Visitors)
+                {
+                    VoteForEntry(v.Value.Agent, revoked.Agent);
+                }
             }
         }
-
-        
+        catch (Exception e)
+        {
+            if (DebugLogging) Log.Write("Vote Exception: " + e);
+        }
     }
 
     private void onChat(ChatData data)
