@@ -63,9 +63,12 @@ public class AccessControl : SceneObjectScript
         {
             { "/help", "" },
             { "/log", "" },
+            { "/reset", "" },
             { "/door", "[open or close]" },
             { "/ban", " [user-handle]" },
             { "/unban", "[user-handle]" },
+            { "/admin", "[user-handle]" },
+            { "/radmin", "[user-handle]" }
         };
 
         ScenePrivate.Chat.Subscribe(0, null, onChat);
@@ -94,7 +97,6 @@ public class AccessControl : SceneObjectScript
     {
         AgentPrivate agent = ScenePrivate.FindAgent(userId);
         string handle = agent.AgentInfo.Handle.ToLower();
-        Visitor visitor;
 
         if (DebugLogging) Log.Write(handle, " has entered.");
 
@@ -114,14 +116,7 @@ public class AccessControl : SceneObjectScript
             hasAdmin = isAdmin;
         }
 
-        //if visitor is not found in list add them to the list
-        if (Visitors.TryGetValue(handle, out visitor))
-        {
-            if (DebugLogging) Log.Write(visitor.Name + " has been found in the visitor log.");
-        } else
-        {
-            LogEntry(agent);
-        }
+        LogEntry(agent);
 
         if (!IsBanned(agent))
         {
@@ -136,9 +131,8 @@ public class AccessControl : SceneObjectScript
         } else
         {
             //if already on banlist bannish them
-            IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(1), () => { Bannish(agent); });
+            IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(3), () => { Bannish(agent); });
         }
-
     }
 
     private void LogEntry(AgentPrivate agent)
@@ -215,7 +209,7 @@ public class AccessControl : SceneObjectScript
             if (DebugLogging) Log.Write(agent.AgentInfo.Name + " has been added to banlist");
         }
 
-        IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(1), () => { Bannish(agent); });
+        IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(3), () => { Bannish(agent); });
     }
 
     private void RemoveUserBan(AgentPrivate agent)
@@ -269,16 +263,29 @@ public class AccessControl : SceneObjectScript
             }
         }
 
+        message += "\nAdmin list: ";
+        foreach (var a in Admins)
+        {
+            message += "\n - " + a;
+        }
+
+
         message += "\nBanned list: ";
         foreach (var b in Banned)
         {
-            message += "\n" + b;
+            message += "\n - " + b;
         }
 
         agent.SendChat(message);
     }
 
-    private void onDoorCommand(AgentPrivate agent, string param)
+    private void onReset()
+    {
+        if (DebugLogging) Log.Write("Resetting world.");
+        ScenePrivate.ResetScene();
+    }
+
+    private void onDoorCommand(string param)
     {
         if(String.IsNullOrEmpty(param))
         {
@@ -290,7 +297,7 @@ public class AccessControl : SceneObjectScript
         if (DebugLogging) Log.Write("Doors are open = " + DoorsOpen);
     }
 
-    private void onBanCommand(AgentPrivate agent, string param)
+    private void onBanCommand(string param)
     {
         if (DebugLogging) Log.Write("Ban Command triggered. " + param);
 
@@ -310,7 +317,7 @@ public class AccessControl : SceneObjectScript
         }
     }
 
-    private void onUnBanCommand(AgentPrivate agent, string param)
+    private void onUnBanCommand(string param)
     {
         if (DebugLogging) Log.Write("UnBan Command triggered. " + param);
 
@@ -330,7 +337,18 @@ public class AccessControl : SceneObjectScript
             if (DebugLogging) Log.Write("UnBan Exception: " + e);
         }
     }
-        
+
+    private void onAddAdmin(string param)
+    {
+        Admins.Add(param.ToLower());
+        if (DebugLogging) Log.Write(param + " has been added to admins list");
+    }
+
+    private void onRemoveAdmin(string param)
+    {
+        Admins.Remove(param.ToLower());
+        if (DebugLogging) Log.Write(param + " has been removed to admins list");
+    }
 
     private void onChat(ChatData data)
     {
@@ -363,14 +381,23 @@ public class AccessControl : SceneObjectScript
                 case "/log":
                     onShowLog(agent);
                     break;
+                case "/reset":
+                    onReset();
+                    break;
                 case "/door":
-                    onDoorCommand(agent, chatWords[1]);
+                    onDoorCommand(chatWords[1]);
                     break;
                 case "/ban":
-                    onBanCommand(agent, chatWords[1]);
+                    onBanCommand(chatWords[1]);
                     break;
                 case "/unban":
-                    onUnBanCommand(agent, chatWords[1]);
+                    onUnBanCommand(chatWords[1]);
+                    break;
+                case "/admin":
+                    onAddAdmin(chatWords[1]);
+                    break;
+                case "/radmin":
+                    onRemoveAdmin(chatWords[1]);
                     break;
                 //case "/vote":
                 default: break;
