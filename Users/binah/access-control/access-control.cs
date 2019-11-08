@@ -68,7 +68,8 @@ public class AccessControl : SceneObjectScript
             { "/ban", " [user-handle]" },
             { "/unban", "[user-handle]" },
             { "/admin", "[user-handle]" },
-            { "/radmin", "[user-handle]" }
+            { "/radmin", "[user-handle]" },
+            { "/vote", "[user-handle]" }
         };
 
         ScenePrivate.Chat.Subscribe(0, null, onChat);
@@ -185,20 +186,27 @@ public class AccessControl : SceneObjectScript
     {
         if (DebugLogging) Log.Write("Checking Access");
         string message = "Allow " + agent.AgentInfo.Name + " to enter?";
-        Visitor admin = Visitors[Admins[0]];
-        ModalDialog modalDialog = admin.Agent.Client.UI.ModalDialog;
-        modalDialog.Show(message, "Yes", "No", (opc) =>
+        try
         {
-            if(modalDialog.Response == "Yes")
+            Visitor admin = Visitors[Admins[0]];
+            ModalDialog modalDialog = admin.Agent.Client.UI.ModalDialog;
+            modalDialog.Show(message, "Yes", "No", (opc) =>
             {
-                if (DebugLogging) Log.Write("Entry was granted.");
-                GrantEntry(agent);
-            } else
-            {
-                if (DebugLogging) Log.Write("Entry was denied.");
-                BanUser(agent);
-            }
-        });
+                if (modalDialog.Response == "Yes")
+                {
+                    if (DebugLogging) Log.Write("Entry was granted.");
+                    GrantEntry(agent);
+                }
+                else
+                {
+                    if (DebugLogging) Log.Write("Entry was denied.");
+                    BanUser(agent);
+                }
+            });
+        } catch (Exception e)
+        {
+            if (DebugLogging) Log.Write("Entry Exception: " + e);
+        }
     }
 
     private void BanUser(AgentPrivate agent)
@@ -350,6 +358,72 @@ public class AccessControl : SceneObjectScript
         if (DebugLogging) Log.Write(param + " has been removed to admins list");
     }
 
+    private int kicks;
+    private int keeps;
+
+    private void VoteForEntry(AgentPrivate admin, AgentPrivate agent)
+    {
+        string message = "Kick and ban " + agent.AgentInfo.Name + " ?";
+
+        try
+        {
+            ModalDialog modalDialog = admin.Client.UI.ModalDialog;
+            modalDialog.Show(message, "Yes", "No", (opc) =>
+            {
+                if (modalDialog.Response == "Yes")
+                {
+                    kicks = kicks + 1;
+                    if (DebugLogging) Log.Write(admin.AgentInfo.Name + " voted to ban " + agent.AgentInfo.Name);
+                }
+                else
+                {
+                    keeps = keeps + 1;
+                    if (DebugLogging) Log.Write(admin.AgentInfo.Name + " voted to keep " + agent.AgentInfo.Name);
+                }
+
+                IEventSubscription timerEvent = Timer.Create(TimeSpan.FromSeconds(5), () => {
+                    modalDialog.Cancel();
+                    if (DebugLogging) Log.Write("kicks " + kicks + " keeps " + keeps);
+                    if(kicks > keeps)
+                    {
+                        BanUser(agent);
+                    } else
+                    {
+                        if (DebugLogging) Log.Write("Voted to keep " + agent.AgentInfo.Name);
+                    }
+                });
+            });
+        }
+        catch (Exception e)
+        {
+            if (DebugLogging) Log.Write("Voting Exception: " + e);
+        }
+    }
+
+    private void onVote(string param)
+    {
+        kicks = 0;
+        keeps = 0;
+        Visitor revoked = Visitors[param.ToLower()];
+
+        if (hasAdmin)
+        {
+            foreach (var a in Admins)
+            {
+                Visitor admin = Visitors[a];
+                VoteForEntry(admin.Agent, revoked.Agent);
+            }
+        } else
+        {
+            foreach (var v in Visitors)
+            {
+                VoteForEntry(v.Value.Agent, revoked.Agent);
+            }
+        }
+
+        
+    }
+
     private void onChat(ChatData data)
     {
         AgentPrivate agent = ScenePrivate.FindAgent(data.SourceId);
@@ -399,7 +473,9 @@ public class AccessControl : SceneObjectScript
                 case "/radmin":
                     onRemoveAdmin(chatWords[1]);
                     break;
-                //case "/vote":
+                case "/vote":
+                    onVote(chatWords[1]);
+                    break;
                 default: break;
             }
         }
