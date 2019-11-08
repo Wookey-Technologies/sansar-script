@@ -236,7 +236,7 @@ public class AccessControl : SceneObjectScript
 
     private void onShowHelp(AgentPrivate agent)
     {
-        string helpMessage = "MediaChatCommand usage:";
+        string helpMessage = "Access Control Command usage:";
         foreach (var kvp in _commandsUsage)
         {
             helpMessage += "\n" + kvp.Key + " " + kvp.Value;
