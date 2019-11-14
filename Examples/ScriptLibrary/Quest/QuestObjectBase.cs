@@ -57,7 +57,7 @@ namespace ScriptLibrary
         [DisplayName("Cancel Distance")]
         public float CancelDistance;
 
-        [Tooltip("Collected Hint\nIf set a hint will be shown briefly after a hint is collected. If the quest has a required count the hint will include the progress on that collection.")]
+        [Tooltip("Collected Hint\nIf set a hint will be shown briefly after an objective is collected. If the quest has a required count the hint will include the progress on that collection.")]
         [DefaultValue(false)]
         [DisplayName("Collected Hint")]
         public bool CollectedHintsEnabled = true;
