@@ -4,7 +4,7 @@ using System;
 
 namespace Persistence {
 
-  interface IDatabase
+  public interface IDatabase
   {
     Func<string, DataStore> GetCreateTable(string database);
     bool IsDatabase(string name);
