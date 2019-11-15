@@ -4,7 +4,7 @@ using Sansar.Script;
 namespace Persistence {
   interface IDatabase
   {
-    DataStore CreateDataStore(string tableName);
+    DataStore CreateDataStore(string database, string tableName);
     bool IsDatabase(string name);
   }
 
