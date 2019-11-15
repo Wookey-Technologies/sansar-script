@@ -8,9 +8,9 @@ namespace Persistence {
     bool IsDatabase(string name);
   }
 
-  [Tooltip(@"Persistent script storage is stored in tables, and each table has their own unique global key. Because keys are global, it is paramount that the key you pick for you table is random enough that it cannot be accidently picked by someone else in a script anywhere in Sansar, at any time now and until the end of time.
+  [Tooltip(@"Persistent script storage is stored in tables, and each table has their own unique global key. Because keys are global and permenant, it is paramount that the key you pick for you table is random enough that it cannot be accidently picked by someone else in a script anywhere in Sansar, and watch out your secret key does not get shared with others, at any time now and until the end of time.
 
-This script is meant to provide an easy way to create a unique key for your tables. 9 Secret numbers must be picked that will form a database namespace for all your tables. A database here is just a prefix with all the numbers for each table you create. The database name is just used by other scripts to find the right namespace within the scene, but it can be anything and a different name in each scene you share the database with, only the numbers act as the database namespace.
+This script is meant to provide an easy way to create a unique key for your tables, and save you from having to share your secret key with 3rd party scripts. 9 Secret numbers must be picked that will form a database namespace for all your tables. A database here is just a prefix with all the numbers for each table you create. The database name is just used by other scripts to find the right namespace within the scene, but it can be anything and a different name in each scene you share the database with, only the numbers act as the database namespace.
 
 Other scripts must be compatible with this script in order to utilize this safe storage mechanism, they will need to ask you for a database name and a table name. You place this script in the scene only once per database. To share a database, just give this script to someone else along with all the numbers you used for your own database.
 
