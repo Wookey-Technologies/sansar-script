@@ -1,7 +1,18 @@
 # Safe Data Store
 
-In order to easily share table keys between scripts between different scripters we need a standard way use a secret for all our table keys, so that for every table a user wants to use they have to supply a secret, but that secret should be used the same in every script along with the table name in the way it forms the key, and it would need a foolproof way to have standard entropy including avoiding default values for the secret. 
+Persistent script storage is stored in tables, and each table has their own unique global key. Because keys are global and permenant, it is paramount that the key you pick for you table is random enough that it cannot be accidently picked by someone else in a script anywhere in Sansar, at any time now and until the end of time.
 
-The mechanism I propose is have reflectives in the scene for shared "database" secrets, then every other script just needs to know the database name and table name where each database had its secret configured. Hiding database names from other scripts is also needed.
+This script is meant to provide an easy way to create a unique key for your tables, and allow other scripts to create tables dynamically. 9 Secret numbers must be picked that will form a database namespace for all your tables. A database here is just a prefix with all the numbers for each table you create. The database _name_ is just used by other scripts to find the right namespace within the scene, but it can be anything and a different name in each scene you share the database with, only the numbers act as the database namespace.
 
-You could do this with just a single int param and a table name but 4 billion possible numbers is not enough entropy, plus it would lead to default numbers (11111, 2222, etc) being used. We could use a range parameter so that its easier to pick a random number with the mouse, but there is not enough granularity when dragging the slider. So i suggest a reflective that has several range parameters that exceed int limits when strung together.
+Other scripts must be compatible with this script in order to utilize this safe storage mechanism, they will need to ask you for a database name. You place this script in the scene only once per database. To share a database, just give this script to someone else along with all the numbers you used for your own database.
+
+It is not recommended to use this script in products you sell, because anyone can see the parameters, get your database key, and potentially make edits to your database with their own scripts.
+
+The code can be found here:
+https://github.com/darwinrecreant/sansar-script/tree/master/Users/evoav/SafeDataStore
+
+Its best to have a global way to share table keys safely, so share this script with other scripters and let them implement the same solution so that tables can be shared between scripts safely.
+
+## For Scripters
+
+You can extend this class to add functionality, but do not change the main api. It was kept simple intentionally so that all other scripts now and in the future could work with it.
