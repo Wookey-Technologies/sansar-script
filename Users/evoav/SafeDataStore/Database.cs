@@ -24,7 +24,7 @@ https://github.com/darwinrecreant/sansar-script/tree/master/Users/evoav/SafeData
 Its best to have a global way to share table keys safely, so share this script with other scripters and let them implement the same solution so that tables can be shared between scripts safely.")]
   [DisplayName("Database")]
   [RegisterReflective]
-  class Database : SceneObjectScript, IDatabase
+  public class Database : SceneObjectScript, IDatabase
   {
     [Tooltip("This is the identifier you use in other scripts to target the right table namesapce. This is a required field.")]
     [DisplayName("Database Name")]
