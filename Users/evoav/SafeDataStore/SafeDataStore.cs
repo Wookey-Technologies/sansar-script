@@ -67,8 +67,9 @@ namespace Persistence {
       return DatabaseName == name;
     }
 
-    public DataStore CreateDataStore(string tableName)
+    public DataStore CreateDataStore(string database, string tableName)
     {
+      if (database != DatabaseName) return null;
       return ScenePrivate.CreateDataStore(salt + tableName);
     }
   }
