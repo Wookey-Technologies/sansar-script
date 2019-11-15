@@ -26,43 +26,53 @@ Its best to have a global way to share table keys safely, so share this script w
   {
     [Tooltip("This is the identifier you use in other scripts to target the right table namesapce. This is a required field.")]
     [DisplayName("Database Name")]
-    public readonly string DatabaseName;
+    [EditorVisible(true)]
+    readonly string DatabaseName;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #1")]
-    public readonly int Salt1;
+    [EditorVisible(true)]
+    readonly int Salt1;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #2")]
-    public readonly int Salt2;
+    [EditorVisible(true)]
+    readonly int Salt2;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #3")]
-    public readonly int Salt3;
+    [EditorVisible(true)]
+    readonly int Salt3;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #4")]
-    public readonly int Salt4;
+    [EditorVisible(true)]
+    readonly int Salt4;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #5")]
-    public readonly int Salt5;
+    [EditorVisible(true)]
+    readonly int Salt5;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #6")]
-    public readonly int Salt6;
+    [EditorVisible(true)]
+    readonly int Salt6;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #7")]
-    public readonly int Salt7;
+    [EditorVisible(true)]
+    readonly int Salt7;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #8")]
-    public readonly int Salt8;
+    [EditorVisible(true)]
+    readonly int Salt8;
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #9")]
-    public readonly int Salt9;
+    [EditorVisible(true)]
+    readonly int Salt9;
 
     bool IsValid
     {
