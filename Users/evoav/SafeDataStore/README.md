@@ -17,7 +17,7 @@ Its best to have a global way to share table keys safely, so share this script w
 
 You can extend this class to add functionality, but do not change the main api. It was kept simple intentionally so that all other scripts now and in the future could work with it.
 
-The use the database you must find the database reflective like so:
+To use the database you must find the database reflective like so:
 
 ```csharp
 using Sansar.Simulation;
