@@ -2,7 +2,13 @@ using Sansar.Simulation;
 using System;
 using Sansar.Script;
 
-namespace Persistence {
+namespace Examples {
+  public interface IDatabase
+  {
+    Func<string, DataStore> GetCreateTable(string database);
+    DataStore GetSchemaAccess(string database, string schemaPassword);
+    bool IsDatabase(string name);
+  }
   class ExampleDatabase : SceneObjectScript {
     public string DatabaseName;
     Func<string, DataStore> createTable = null;
