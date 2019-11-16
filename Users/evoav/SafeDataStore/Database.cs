@@ -128,7 +128,7 @@ Its best to have a global way to share table keys safely, so share this script w
       schema.Restore("scenes", (DataStore.Result<Dictionary<string, Dictionary<string, string>>> res) => {
         Dictionary<string, Dictionary<string, string>> scenes = new Dictionary<string, Dictionary<string, string>>();
         if (res.Success) scenes = res.Object;
-        Dictionary<string, string> info = scenes[ScenePrivate.SceneInfo.ExperienceId] = new Dictionary<string, string>();
+        Dictionary<string, string> info = scenes[ScenePrivate.SceneInfo.LocationHandle] = new Dictionary<string, string>();
         info["name"] = ScenePrivate.SceneInfo.ExperienceName;
         info["last-use"] = DateTime.UtcNow.ToString("o");
         info["owner"] = ScenePrivate.SceneInfo.AvatarId;
@@ -156,9 +156,9 @@ Its best to have a global way to share table keys safely, so share this script w
               foreach (string t in ts) {
                 if (!tables.ContainsKey(t)) {
                   hasNew = true;
-                  tables[tableName] = "";
+                  tables[t] = t;
                   if (Debug) {
-                    Log.Write("[Database]", "[" + DatabaseName + "] - [new-table]: " + tableName);
+                    Log.Write("[Database]", "[" + DatabaseName + "] - [new-table]: " + t);
                   }
                 }
               }
