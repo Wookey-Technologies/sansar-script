@@ -1,12 +1,14 @@
 using Sansar.Simulation;
 using Sansar.Script;
 using System;
+using System.Collections.Generic;
 
 namespace Persistence {
 
   public interface IDatabase
   {
     Func<string, DataStore> GetCreateTable(string database);
+    DataStore GetSchemaAccess(string database, string schemaPassword);
     bool IsDatabase(string name);
   }
 
@@ -30,6 +32,15 @@ Its best to have a global way to share table keys safely, so share this script w
     [DisplayName("Database Name")]
     [EditorVisible(true)]
     readonly string DatabaseName;
+    [Tooltip("The schema access password, for managing tables. If left empty then no access will be granted.")]
+    [DisplayName("Schema Access")]
+    [EditorVisible(true)]
+    readonly string SchemaAccess;
+
+    [Tooltip("If enabled, all created tables will print in console.")]
+    [DisplayName("Debug")]
+    public bool Debug;
+
     [Tooltip("None of the sceret numbers are allowed to be 0 or 100, and they are not allowed to all be the same number.")]
     [Range(0, 100)]
     [DisplayName("Secret Number #1")]
@@ -76,6 +87,9 @@ Its best to have a global way to share table keys safely, so share this script w
     [EditorVisible(true)]
     readonly int Salt9;
 
+    List<string> tablesToAdd = new List<string>();
+    List<string> tablesToDelete = new List<string>();
+
     bool IsValid
     {
       get
@@ -94,6 +108,7 @@ Its best to have a global way to share table keys safely, so share this script w
     }
 
     string salt = "";
+    DataStore schema;
     override public void Init()
     {
       if (DatabaseName == "")
@@ -110,6 +125,16 @@ Its best to have a global way to share table keys safely, so share this script w
       }
       salt = Salt1.ToString("00") + Salt2.ToString("00") + Salt3.ToString("00") + Salt4.ToString("00") + Salt5.ToString("00") + Salt6.ToString("00") + Salt7.ToString("00") + Salt8.ToString("00") + Salt9.ToString("00");
 
+      schema = ScenePrivate.CreateDataStore(salt + salt + "__schema__");
+      schema.Restore("scenes", (DataStore.Result<Dictionary<string, Dictionary<string, string>>> res) => {
+        Dictionary<string, Dictionary<string, string>> scenes = new Dictionary<string, Dictionary<string, string>>();
+        if (res.Success) scenes = res.Object;
+        Dictionary<string, string> info = scenes[ScenePrivate.SceneInfo.ExperienceId] = new Dictionary<string, string>();
+        info["name"] = ScenePrivate.SceneInfo.ExperienceName;
+        info["last-use"] = DateTime.UtcNow.ToString("o");
+        info["owner"] = ScenePrivate.SceneInfo.AvatarId;
+        schema.Store("scenes", scenes);
+      });
     }
 
     public bool IsDatabase(string name)
@@ -120,7 +145,63 @@ Its best to have a global way to share table keys safely, so share this script w
     public Func<string, DataStore> GetCreateTable(string database)
     {
       if (database != DatabaseName) return null;
-      return (string tableName) => ScenePrivate.CreateDataStore(salt + tableName);
+      return (string tableName) => {
+        if (tablesToAdd.Count == 0) {
+          Timer.Create(.5, () => {
+            List<string> ts = tablesToAdd;
+            tablesToAdd = new List<string>();
+            schema.Restore("tables", (DataStore.Result<Dictionary<string, string>> res) => {
+              Dictionary<string, string> tables = new Dictionary<string, string>();
+              if (res.Success) tables = res.Object;
+              bool hasNew = false;
+              foreach (string t in ts) {
+                if (!tables.ContainsKey(t)) {
+                  hasNew = true;
+                  tables[tableName] = "";
+                  if (Debug) {
+                    Log.Write("[Database]", "[" + DatabaseName + "] - [new-table]: " + tableName);
+                  }
+                }
+              }
+              if (hasNew) {
+                schema.Store("tables", tables);
+              }
+            });
+          });
+        }
+        tablesToAdd.Add(tableName);
+        if (Debug) {
+          Log.Write("[Database]", "[" + DatabaseName + "] - [get-table]: " + tableName);
+        }
+        return ScenePrivate.CreateDataStore(salt + tableName);
+      };
+    }
+
+    public DataStore GetSchemaAccess(string database, string schemaPassword) {
+      if (SchemaAccess == "" || database != DatabaseName || schemaPassword != SchemaAccess) {
+        if (Debug) {
+          Log.Write(LogLevel.Warning, "[Database]", "[" + DatabaseName + "] - [schema-acess]: denied" + (SchemaAccess == "" ? ", no schema password defined" : ""));
+        }
+        return null;
+      }
+      if (Debug) {
+        Log.Write("[Database]", "[" + DatabaseName + "] - [schema-acess]: granted");
+      }
+      return schema;
+    }
+
+    public static Func<string, DataStore> FindDatabase(ScenePrivate ScenePrivate, Action<double> Wait, string databaseName) {
+      float waitAmount = 0.75f;
+      Func<string, DataStore> createTable;
+      while (waitAmount < 4) {
+        foreach (IDatabase db in ScenePrivate.FindReflective<IDatabase>("Persistence.Database")) {
+          createTable = db.GetCreateTable(databaseName);
+          if (createTable != null) return createTable;;
+        }
+        Wait(waitAmount);
+        waitAmount += waitAmount;
+      }
+      return null;
     }
   }
 }
