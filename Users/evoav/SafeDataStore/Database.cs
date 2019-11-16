@@ -88,7 +88,6 @@ Its best to have a global way to share table keys safely, so share this script w
     readonly int Salt9;
 
     List<string> tablesToAdd = new List<string>();
-    List<string> tablesToDelete = new List<string>();
 
     bool IsValid
     {
@@ -180,12 +179,12 @@ Its best to have a global way to share table keys safely, so share this script w
     public DataStore GetSchemaAccess(string database, string schemaPassword) {
       if (SchemaAccess == "" || database != DatabaseName || schemaPassword != SchemaAccess) {
         if (Debug) {
-          Log.Write(LogLevel.Warning, "[Database]", "[" + DatabaseName + "] - [schema-acess]: denied" + (SchemaAccess == "" ? ", no schema password defined" : ""));
+          Log.Write(LogLevel.Warning, "[Database]", "[" + DatabaseName + "] - [schema-access]: denied" + (SchemaAccess == "" ? ", no schema password defined" : ""));
         }
         return null;
       }
       if (Debug) {
-        Log.Write("[Database]", "[" + DatabaseName + "] - [schema-acess]: granted");
+        Log.Write("[Database]", "[" + DatabaseName + "] - [schema-access]: granted");
       }
       return schema;
     }
