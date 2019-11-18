@@ -28,25 +28,24 @@ public class AudioStreamChatCommand : SceneObjectScript
     private HashSet<string> _allowedAgents;
     private Dictionary<string, string> _commandsUsage;
 
-    private AudioComponent audio;
+    private PlayHandle scenePlayHandle;
 
     public override void Init()
     {
-        ObjectPrivate.TryGetFirstComponent(out audio);
-
         _allowedAgents = SplitStringIntoHashSet(AllowedAgents);
 
         _commandsUsage = new Dictionary<string, string>
         {
             { "/help", "" },
-            { "/stream", "[url]" },
-            { "/stopaudio", "" },
-            { "/mute", ""}
+            { "/stream", "[url - leave blank to stop stream]" },
+            { "/volume", "[0-100 increments of 10]" }
         };
 
         ScenePrivate.Chat.Subscribe(Chat.DefaultChannel, OnChat);
-    }
 
+        scenePlayHandle = ScenePrivate.PlayStream(StreamChannel.AudioChannel, LoudnessPercentToDb(AudioStreamLoudness));
+        if (DebugLogging) Log.Write("setHandle " + scenePlayHandle);
+    }
 
     HashSet<string> SplitStringIntoHashSet(string commaSeparatedString)
     {
@@ -86,9 +85,22 @@ public class AudioStreamChatCommand : SceneObjectScript
         return true;
     }
 
+    float LoudnessPercentToDb(float loudnessPercent)
+    {
+        if (DebugLogging) Log.Write("LoudnessPercentToDb " + loudnessPercent);
+
+        loudnessPercent = Math.Min(Math.Max(loudnessPercent, 0.0f), 100.0f);
+
+        if (DebugLogging) Log.Write("loudnessPerscent step 1 " + loudnessPercent);
+
+        float returnVal = 60.0f * (loudnessPercent / 100.0f) - 48.0f;
+
+        if (DebugLogging) Log.Write("loudnessPerscent out " + returnVal.ToString());
+
+        return returnVal;
+    }
 
     //Chat Commands
-
     private void onShowHelp(AgentPrivate agent)
     {
         string helpMessage = "Audio Control Command usage:";
@@ -115,7 +127,6 @@ public class AudioStreamChatCommand : SceneObjectScript
         try
         {
             ScenePrivate.OverrideAudioStream(medialUrl);
-
             agent.SendChat("Audio Stream URL successfully updated to " + medialUrl);
             if (DebugLogging)  Log.Write("New audio stream URL: " + medialUrl);
         } catch
@@ -135,6 +146,64 @@ public class AudioStreamChatCommand : SceneObjectScript
                 // Agent left
             }
         }
+    }
+
+    void setVolume(float volume)
+    {
+        if (DebugLogging) Log.Write("setVolume " + volume);
+
+        if((scenePlayHandle != null) && scenePlayHandle.IsPlaying())
+        {
+            scenePlayHandle.SetLoudness(LoudnessPercentToDb(volume));
+        }
+    }
+
+    void onVolume(string volume)
+    {
+        if (DebugLogging) Log.Write("onVolume " + volume);
+
+        float _volume = AudioStreamLoudness;
+
+        switch (volume)
+        {
+            case "0":
+                _volume = 0.0f;
+                break;
+            case "10":
+                _volume = 10.0f;
+                break;
+            case "20":
+                _volume = 20.0f;
+                break;
+            case "30":
+                _volume = 30.0f;
+                break;
+            case "40":
+                _volume = 40.0f;
+                break;
+            case "50":
+                _volume = 50.0f;
+                break;
+            case "60":
+                _volume = 60.0f;
+                break;
+            case "70":
+                _volume = 70.0f;
+                break;
+            case "80":
+                _volume = 80.0f;
+                break;
+            case "90":
+                _volume = 90.0f;
+                break;
+            case "100":
+                _volume = 100.0f;
+                break;
+            default:
+                break;
+        }
+
+        setVolume(_volume);
     }
 
     void OnChat(ChatData data)
@@ -170,14 +239,13 @@ public class AudioStreamChatCommand : SceneObjectScript
             case "/stream":
                 onStream(agent, chatWords.Length < 2 ? "" : chatWords[1]);
                 break;
+            case "/volume":
+                onVolume(chatWords[1]);
+                break;
             default: break;
         }
 
     }
 
-    float LoudnessPercentToDb(float loudnessPercent)
-    {
-        loudnessPercent = Math.Min(Math.Max(loudnessPercent, 0.0f), 100.0f);
-        return 60.0f * (loudnessPercent / 100.0f) - 48.0f;
-    }
+
 }
