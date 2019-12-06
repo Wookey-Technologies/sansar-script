@@ -79,7 +79,7 @@ If StartEnabled is false then the script will not respond until an (-> Enable) e
                     var questData = WaitFor(QuestDefinition.GetQuest, sessionId) as QuestDefinition.GetQuestData;
                     try
                     {
-                        if (questData.Success && (questData.Quest.GetState() == QuestState.None || questData.Quest.GetState() == QuestState.None))
+                        if (questData.Success && (questData.Quest.GetState() == QuestState.None || questData.Quest.GetState() == QuestState.Offered))
                         {
                             questData.Quest.Offer();
                         }
