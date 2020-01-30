@@ -69,7 +69,7 @@ public class MaterialDemo : SceneObjectScript
     [DisplayName("Color")]
     [Tooltip("Color to change tint of mesh. example: (0.35,0,0.88,1)")]
     [DefaultValue("(0.35,0,0.88,1)")]
-    public readonly Sansar.Color tint;
+    public readonly string tint;
     
     [DisplayName("Emissive Command")]
     [Tooltip("Command to change emissive intensity of mesh")]
