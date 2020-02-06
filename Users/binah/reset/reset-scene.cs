@@ -24,7 +24,7 @@ public class ResetScene : SceneObjectScript
     [DefaultValue(true)]
     public bool ChatEnabled;
 
-    [DefaultValue("Click Me!")]
+    [DefaultValue("Reset Scene!")]
     public Interaction MyInteraction;
 
     [DefaultValue(true)]
