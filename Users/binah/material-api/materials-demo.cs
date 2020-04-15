@@ -12,31 +12,25 @@ using System.Linq;
  Usage:
     Add script to mesh
     Configure Log Tag parameter if using multiple objects, to disambiguate script output
-
 Valid propertyName values are:
                     
                     absorption (float value)
                     MaterialProperties.Absorption;
-
                     brightness (float value)
                     MaterialProperties.Brightness;
-
                     emissiveintensity (float value)
                     MaterialProperties.EmissiveIntensity;
                     
                     flipbookframe (float value)
                     MaterialProperties.FlipbookFrame;
-
                     tint  (color value)
                     MaterialProperties.Tint;
-
 Supported interpolation modes are:
     easein      Ease In. The value will gradually speed up and continue quickly at the end.
     easeout     Ease Out. The value will change quickly at first and slow down to smoothly reach the goal.
     linear      Linear Interpolation. The value will change at a constant rate.
     smoothstep  Smoothstep Interpolation. The value will speed up gradually and slow down to smoothly reach the goal.
     stepStep    Step. The value will step abruptly from the initial value to the final value half-way through.
-
 */
 
 public class MaterialDemo : SceneObjectScript
@@ -47,30 +41,51 @@ public class MaterialDemo : SceneObjectScript
     [Tooltip("Tag to use when writing messages to debug console")]
     public readonly string LogTag = "";
 
+    [DisplayName("Absorbtion Command")]
+    [Tooltip("Command to change Absorbtion of mesh")]
+    [DefaultValue("change_absorption")]
+    public readonly string AbsorptionCommand;
+
+    [DisplayName("Absorption Value")]
+    [Tooltip("Value of Absorption - untested")]
+    [DefaultValue(1.0f)]
+    public readonly float Absorption;
+
+    [DisplayName("Brightness Command")]
+    [Tooltip("Command to change Brightness of mesh")]
+    [DefaultValue("change_brightness")]
+    public readonly string BrightnessCommand;
+
+    [DisplayName("Brightness Value")]
+    [Tooltip("Value of Brightness - untested")]
+    [DefaultValue(1.0f)]
+    public readonly float Brightness;
+
     [DisplayName("Tint Command")]
     [Tooltip("Command to change tint of mesh")]
     [DefaultValue("change_tint")]
-    public string TintCommand;
+    public readonly string TintCommand;
 
     [DisplayName("Color")]
     [Tooltip("Color to change tint of mesh. example: (0.35,0,0.88,1)")]
     [DefaultValue("(0.35,0,0.88,1)")]
-    public string Color;
+    public readonly Sansar.Color tint;
 
     [DisplayName("Emissive Command")]
     [Tooltip("Command to change emissive intensity of mesh")]
     [DefaultValue("emissive_intensity")]
-    public string EmissiveCommand;
+    public readonly string EmissiveCommand;
 
+    [DisplayName("Emissive Intensity")]
     [Tooltip("Emissive Intensity to change mesh")]
     [DefaultValue(3.0f)]
-    [DisplayName("Emissive Intensity")]
+
     public readonly float EmissiveIntensity;
 
     [DisplayName("Flipbook Command")]
     [Tooltip("Command to play frames of a flipbook")]
     [DefaultValue("play_flipbook")]
-    public string FlipbookCommand;
+    public readonly string FlipbookCommand;
 
     [Tooltip("Total number of frames")]
     [DefaultValue(32.0f)]
@@ -85,11 +100,9 @@ public class MaterialDemo : SceneObjectScript
     [DisplayName("Interpolation Mode")]
     [Tooltip("easein, easeout, linear, smoothstep, step")]
     [DefaultValue("smoothstep")]
-    public string Interpolation;
+    public readonly string Interpolation;
 
     #endregion
-
-
     public interface ISimpleData
     {
         AgentInfo AgentInfo { get; }
@@ -104,11 +117,14 @@ public class MaterialDemo : SceneObjectScript
 
     public override void Init()
     {
+
+
         if (!ObjectPrivate.TryGetFirstComponent(out Mesh))
         {
             Log.Write(LogLevel.Error, LogTag, "No MeshComponent found!  Aborting.");
             return;
-        } else
+        }
+        else
         {
             List<RenderMaterial> materials = Mesh.GetRenderMaterials().ToList();
             if (materials.Count == 0)
@@ -139,14 +155,36 @@ public class MaterialDemo : SceneObjectScript
                 Log.Write(LogLevel.Warning, LogTag, $"MeshComponent {Mesh.Name} is not scriptable");
             }
 
-            SubscribeToScriptEvent(TintCommand, (ScriptEventData data) =>
+            SubscribeToScriptEvent(AbsorptionCommand, (ScriptEventData data) =>
             {
                 ISimpleData idata = data.Data.AsInterface<ISimpleData>();
-                
+
                 RenderMaterial m = Mesh.GetRenderMaterial(materials[0].Name);
                 MaterialProperties p = m.GetProperties();
 
-                if (!Sansar.Color.TryParse(Color, out p.Tint))
+                p.Absorption = Absorption;
+                m.SetProperties(p, Duration, InterpolationModeParse(Interpolation));
+            });
+
+            SubscribeToScriptEvent(BrightnessCommand, (ScriptEventData data) =>
+            {
+                ISimpleData idata = data.Data.AsInterface<ISimpleData>();
+
+                RenderMaterial m = Mesh.GetRenderMaterial(materials[0].Name);
+                MaterialProperties p = m.GetProperties();
+
+                p.Brightness = Brightness;
+                m.SetProperties(p, Duration, InterpolationModeParse(Interpolation));
+            });
+
+            SubscribeToScriptEvent(TintCommand, (ScriptEventData data) =>
+            {
+                ISimpleData idata = data.Data.AsInterface<ISimpleData>();
+
+                RenderMaterial m = Mesh.GetRenderMaterial(materials[0].Name);
+                MaterialProperties p = m.GetProperties();
+
+                if (!Sansar.Color.TryParse(tint.ToRGBA(), out p.Tint))
                 {
                     Log.Write(LogLevel.Error, LogTag, "TintCommand: Failed to parse as Sansar.Color");
                     return;
@@ -162,6 +200,17 @@ public class MaterialDemo : SceneObjectScript
                 MaterialProperties p = m.GetProperties();
 
                 p.EmissiveIntensity = EmissiveIntensity;
+                m.SetProperties(p, Duration, InterpolationModeParse(Interpolation));
+            });
+
+            SubscribeToScriptEvent(FlipbookCommand, (ScriptEventData data) =>
+            {
+                ISimpleData idata = data.Data.AsInterface<ISimpleData>();
+
+                RenderMaterial m = Mesh.GetRenderMaterial(materials[0].Name);
+                MaterialProperties p = m.GetProperties();
+
+                p.FlipbookFrame = Frames;
                 m.SetProperties(p, Duration, InterpolationModeParse(Interpolation));
             });
 
